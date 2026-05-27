@@ -129,7 +129,7 @@ input[type=date]#datePicker{background:none;border:none;font-family:'IBM Plex Mo
 
 /* ── MAP ── */
 .grid-2.g-65-35 > .panel:first-child{display:flex;flex-direction:column}
-#deliveryMap{flex:1;min-height:400px;width:100%;filter:grayscale(30%) contrast(1.15) brightness(1.1)}
+#deliveryMap{flex:1;min-height:400px;width:100%;filter:grayscale(10%) contrast(1.3) brightness(1.4)}
 .map-legend{display:flex;gap:16px;padding:7px 14px;border-top:1px solid var(--border);background:var(--panel2)}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
 .legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
@@ -525,7 +525,8 @@ async function loadData(){
 function initMap(){
   if(leafletMap)return;
   leafletMap=L.map('deliveryMap',{zoomControl:true,attributionControl:false}).setView([43.2,-83.5],7);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(leafletMap);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter_no_labels/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(leafletMap);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:18,opacity:0.7}).addTo(leafletMap);
   L.circleMarker([43.1392,-83.0836],{radius:7,fillColor:'#fff',fillOpacity:1,color:'#555',weight:1.5})
     .addTo(leafletMap).bindPopup('<b style="font-family:monospace">BCC Yard — Marlette, MI</b>');
 }
