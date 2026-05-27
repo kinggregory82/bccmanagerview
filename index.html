@@ -498,10 +498,13 @@ function stopMinutes(s){try{const arr=s.arrivalTime,dep=s.deliveryTime||s.comple
 function metrics(stops){
   const comp=stops.filter(isComplete),pend=stops.filter(s=>!isComplete(s));
   const ph=comp.filter(hasPhoto),sms=stops.filter(hasSms);
-  const late=comp.filter(s=>{if(s.timing==='late')return true;if(s.timing==='early'||s.timing==='ontime')return false;const ml=minutesLate(s);return ml!==null&&ml>30;});
-  const ontime=comp.filter(s=>{if(s.timing==='early'||s.timing==='ontime')return true;if(s.timing==='late')return false;const ml=minutesLate(s);return ml!==null&&ml<=30;});
+  // Only include stops that actually have timing data (field set or arrival+eta available)
+  const hasTimingData=s=>s.timing||((s.arrivalTime||s.completedAt)&&(s.seedEta||s.calculatedEta));
+  const compWithTiming=comp.filter(hasTimingData);
+  const late=compWithTiming.filter(s=>{if(s.timing==='late')return true;if(s.timing==='early'||s.timing==='ontime')return false;const ml=minutesLate(s);return ml!==null&&ml>30;});
+  const ontime=compWithTiming.filter(s=>{if(s.timing==='early'||s.timing==='ontime')return true;if(s.timing==='late')return false;const ml=minutesLate(s);return ml!==null&&ml<=30;});
   return{total:stops.length,complete:comp.length,pending:pend.length,ontime:ontime.length,late:late.length,photos:ph.length,sms:sms.length,
-    ontimePct:comp.length?Math.round(ontime.length/comp.length*100):null,
+    ontimePct:compWithTiming.length?Math.round(ontime.length/compWithTiming.length*100):null,
     photoPct:comp.length?Math.round(ph.length/comp.length*100):null,
     completePct:stops.length?Math.round(comp.length/stops.length*100):null,
     compStops:comp,lateStops:late,noPhotoComp:comp.filter(s=>!hasPhoto(s))};
