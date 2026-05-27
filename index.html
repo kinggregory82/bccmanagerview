@@ -354,7 +354,7 @@ tbody tr:hover{background:var(--panel2)}
           <div class="ph"><span class="pt">Stops by Sales Rep</span><span class="pn">Consolidated</span></div>
           <div class="tbl-wrap">
             <table>
-              <thead><tr><th>Rep</th><th>Total</th><th>Complete</th><th>%</th><th>Total Invoice</th><th>Avg Invoice</th></tr></thead>
+              <thead><tr><th>Rep</th><th>Total</th><th>Complete</th><th>%</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
               <tbody id="salesTbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
             </table>
           </div>
@@ -486,6 +486,7 @@ function getStops(route,routeId){
     _asset:(route.assetDescription||route.asset||'').trim(),
     _date:route.date||'',
     _saleTotal:parseFloat(s.saleTotal||0)||0,
+    _distanceMiles:parseFloat(s.distanceMiles||0)||0,
   }));
 }
 function isComplete(s){return(s.status||'').toLowerCase()==='complete'||(s.deliveryStatus||'').toLowerCase()==='delivered'||!!s.completedAt}
@@ -686,18 +687,22 @@ function render(){
 
   /* SALES */
   const salesMap={};
-  allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0};salesMap[rep].t++;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
+  allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
   const salesList=Object.values(salesMap).sort((a,b)=>b.t-a.t);
-  document.getElementById('salesTbody').innerHTML=salesList.length===0?`<tr><td colspan="6" class="empty">No data</td></tr>`:
+  document.getElementById('salesTbody').innerHTML=salesList.length===0?`<tr><td colspan="8" class="empty">No data</td></tr>`:
     salesList.map(s=>{
       const cp=s.t?Math.round(s.c/s.t*100):0;
       const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+      const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
+      const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
       return`<tr>
         <td style="font-weight:600;color:var(--white)">${s.rep}</td>
         <td>${s.t}</td><td>${s.c}</td>
         <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
+        <td style="color:var(--muted)">${milesStr}</td>
         <td style="color:var(--green);font-weight:600">${fmtMoney(s.invoiceTotal)}</td>
         <td style="color:var(--muted)">${fmtMoney(avgInv)}</td>
+        <td style="color:var(--amber);font-weight:600">${invPerMile}</td>
       </tr>`;
     }).join('');
 
@@ -773,7 +778,7 @@ function runReport(){
 
   /* Sales */
   const salesMap={};
-  allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0};salesMap[rep].t++;if(isComplete(s))salesMap[rep].c++;});
+  allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles||0;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
   const salesReport=Object.values(salesMap).sort((a,b)=>b.t-a.t);
 
   cont.innerHTML=`
@@ -806,14 +811,22 @@ function runReport(){
     <div>
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">By Sales Rep</div>
       <table>
-        <thead><tr><th>Rep</th><th>Total</th><th>Done</th><th>%</th></tr></thead>
+        <thead><tr><th>Rep</th><th>Total</th><th>Done</th><th>%</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
         <tbody>
         ${salesReport.map(s=>{
           const cp=s.t?Math.round(s.c/s.t*100):0;
+          const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
+          const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+          const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
+          const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
           return`<tr>
             <td style="font-weight:600;color:var(--white)">${s.rep}</td>
             <td>${s.t}</td><td>${s.c}</td>
             <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
+            <td style="color:var(--muted)">${milesStr}</td>
+            <td style="color:var(--green);font-weight:600">${fmtM(s.invoiceTotal)}</td>
+            <td style="color:var(--muted)">${fmtM(avgInv)}</td>
+            <td style="color:var(--amber);font-weight:600">${invPerMile}</td>
           </tr>`;
         }).join('')}
         </tbody>
