@@ -666,7 +666,10 @@ function render(){
   /* FLEET */
   const fleetMap={};
   dayRoutes.forEach(([id,r])=>{
-    const asset=(r.assetDescription||r.asset||id).trim(),driver=resolveDriver(r);
+    const assetNum=(r.asset||'').trim();
+    const assetDesc=(r.assetDescription||'').trim();
+    const asset=assetNum?(assetNum+(assetDesc?' '+assetDesc:'')):(assetDesc||id);
+    const driver=resolveDriver(r);
     if(!fleetMap[asset])fleetMap[asset]={asset,driver,done:0,total:0};
     const stops=Object.values(r.stops||{});
     fleetMap[asset].total+=stops.length;fleetMap[asset].done+=stops.filter(isComplete).length;
