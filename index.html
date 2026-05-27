@@ -645,7 +645,8 @@ function render(){
       const sm=stopMinutes(s);if(sm!==null)driverMap[k].stopMins.push(sm);
     }
   });
-  const drivers=Object.values(driverMap).sort((a,b)=>b.t-a.t);
+  const perfScore=x=>{const otp=x.c?x.ot/x.c:null;const php=x.c?x.ph/x.c:null;if(otp===null&&php===null)return-1;return((otp||0)+(php||0))/2;};
+  const drivers=Object.values(driverMap).sort((a,b)=>perfScore(b)-perfScore(a));
   const fmtMoney=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
   document.getElementById('driverMeta').textContent=(isToday?'Live':'Hist')+' · '+ds;
   const dtbody=document.getElementById('driverTbody');
@@ -694,7 +695,7 @@ function render(){
   /* SALES */
   const salesMap={};
   allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
-  const salesList=Object.values(salesMap).sort((a,b)=>b.t-a.t);
+  const salesList=Object.values(salesMap).sort((a,b)=>(b.invoiceTotal||0)-(a.invoiceTotal||0)||b.t-a.t);
   document.getElementById('salesTbody').innerHTML=salesList.length===0?`<tr><td colspan="8" class="empty">No data</td></tr>`:
     salesList.map(s=>{
       const cp=s.t?Math.round(s.c/s.t*100):0;
@@ -780,12 +781,13 @@ function runReport(){
       const sm=stopMinutes(s);if(sm!==null)driverMap[k].stopMins.push(sm);
     }
   });
-  const driversReport=Object.values(driverMap).sort((a,b)=>b.t-a.t);
+  const perfScore=x=>{const otp=x.c?x.ot/x.c:null;const php=x.c?x.ph/x.c:null;if(otp===null&&php===null)return-1;return((otp||0)+(php||0))/2;};
+  const driversReport=Object.values(driverMap).sort((a,b)=>perfScore(b)-perfScore(a));
 
   /* Sales */
   const salesMap={};
   allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles||0;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
-  const salesReport=Object.values(salesMap).sort((a,b)=>b.t-a.t);
+  const salesReport=Object.values(salesMap).sort((a,b)=>(b.invoiceTotal||0)-(a.invoiceTotal||0)||b.t-a.t);
 
   cont.innerHTML=`
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
