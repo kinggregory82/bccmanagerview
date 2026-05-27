@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -334,7 +333,7 @@ tbody tr:hover{background:var(--panel2)}
           <div class="tbl-wrap">
             <table>
               <thead><tr>
-                <th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Total Invoice</th><th>Avg Invoice</th>
+                <th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th>
               </tr></thead>
               <tbody id="driverTbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
             </table>
@@ -402,7 +401,7 @@ const CITY_COORDS={
   'caro':[43.4878,-83.3963],'vassar':[43.3722,-83.5833],'cass city':[43.5978,-83.1747],
   'pigeon':[43.8289,-83.2691],'harbor beach':[43.8428,-82.6513],'ubly':[43.7128,-82.9327],
   'deckerville':[43.5231,-82.7297],'lexington':[43.2678,-82.5342],'port sanilac':[43.4303,-82.5431],
-  'yale':[43.1306,-82.7989],'brown city':[43.2128,-82.9869],'imlay city':[43.0239,-83.0763],
+  'yale':[43.1306,-82.7989],'brown city':[43.2128,-82.9869],'macomb':[42.6728,-82.9263],'waterford':[42.6931,-83.4038],'commerce township':[42.5917,-83.4977],'emmett':[42.9939,-82.7688],'oakland':[42.6667,-83.1833],'hadley':[42.9589,-83.3958],'saint clair':[42.8198,-82.4902],'snover':[43.5178,-82.9575],'deford':[43.5264,-83.1986],'attica':[43.0200,-83.1794],'berkeley':[42.5028,-83.1841],'berkly':[42.5028,-83.1841],'millington':[43.2792,-83.5289],'imlay city':[43.0239,-83.0763],
   'lapeer':[43.0514,-83.3188],'almont':[42.9206,-83.0438],'romeo':[42.8028,-83.0122],
   'richmond':[42.8089,-82.7580],'armada':[42.8448,-82.8858],'port huron':[42.9709,-82.4249],
   'flint':[43.0125,-83.6875],'saginaw':[43.4195,-83.9508],'bay city':[43.5945,-83.8886],
@@ -646,20 +645,17 @@ function render(){
   const fmtMoney=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
   document.getElementById('driverMeta').textContent=(isToday?'Live':'Hist')+' · '+ds;
   const dtbody=document.getElementById('driverTbody');
-  dtbody.innerHTML=drivers.length===0?`<tr><td colspan="7" class="empty">No data</td></tr>`:
+  dtbody.innerHTML=drivers.length===0?`<tr><td colspan="5" class="empty">No data</td></tr>`:
     drivers.map(d=>{
       const otp=d.c?Math.round(d.ot/d.c*100):null;
       const php=d.c?Math.round(d.ph/d.c*100):null;
       const avgStop=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length)+'m':'—';
-      const avgInv=d.invoiceCount>0?d.invoiceTotal/d.invoiceCount:0;
       return`<tr>
         <td><div class="tbl-primary">${d.name}</div><div class="tbl-secondary">${d.asset}</div></td>
         <td>${d.c}/${d.t}</td>
         <td style="color:${pctColor(otp,80,60)};font-weight:600">${otp!==null?otp+'%':'—'}</td>
         <td style="color:${pctColor(php,90,70)};font-weight:600">${php!==null?php+'%':'—'}</td>
         <td>${avgStop}</td>
-        <td style="color:var(--green);font-weight:600">${fmtMoney(d.invoiceTotal)}</td>
-        <td style="color:var(--muted)">${fmtMoney(avgInv)}</td>
       </tr>`;
     }).join('');
 
