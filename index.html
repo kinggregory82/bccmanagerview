@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -995,28 +996,14 @@ function exportChartsPDF() {
     }
   });
 
-  // Michigan SVG path (simplified outline, coordinate space ~250x300)
-  // Marlette, MI is roughly at (148, 142) in this space
-  const MI_PATH = `M 148,15 L 155,18 L 162,22 L 168,28 L 172,35 L 174,42 L 172,48
-    L 168,52 L 162,54 L 158,56 L 156,60 L 157,65 L 160,68 L 165,70 L 172,70
-    L 178,68 L 184,64 L 190,58 L 196,52 L 202,48 L 208,46 L 214,46 L 218,49
-    L 220,54 L 218,60 L 214,66 L 208,71 L 202,74 L 196,76 L 192,80 L 190,86
-    L 191,92 L 194,98 L 198,104 L 202,110 L 204,116 L 204,122 L 202,128
-    L 198,133 L 194,136 L 190,138 L 185,139 L 180,138 L 174,135 L 168,132
-    L 162,130 L 156,130 L 150,132 L 145,136 L 141,142 L 138,149 L 136,156
-    L 136,163 L 138,170 L 142,176 L 148,181 L 154,184 L 160,185 L 166,184
-    L 172,181 L 177,177 L 181,172 L 183,166 L 183,160 L 181,154 L 178,149
-    L 174,145 L 170,143 L 167,144 L 165,148 L 165,153 L 168,157 L 172,159
-    L 176,159 L 179,157 L 180,153 L 178,150 L 174,148
-    M 60,175 L 66,172 L 72,170 L 78,170 L 84,172 L 90,176 L 95,181 L 98,187
-    L 99,193 L 98,199 L 94,204 L 88,208 L 81,210 L 74,210 L 67,208 L 61,204
-    L 57,198 L 55,192 L 56,185 L 60,179 Z`;
-
-  // Zone ring radii in SVG units. 100 miles ≈ 90px in this map scale.
-  // Marlette center in SVG: (148, 142)
-  const CX = 148, CY = 142;
-  const MILE_PX = 0.9; // px per mile at this scale
+  // Michigan Lower Peninsula — real geographic projection
+  // ViewBox 240x230, lon -87.2..-82.2, lat 41.55..46.25
+  // Marlette MI (43.3218N, 83.0836W) → (197.6, 143.3)
+  const CX = 197.6, CY = 143.3;
+  const MILE_PX = 0.709;
   const zoneRadii = [10,25,50,75,100].map(m=>Math.round(m*MILE_PX));
+
+  const LP_D = "M 119.0,23.0 L 123.8,29.9 L 131.5,34.3 L 147.4,36.7 L 161.3,33.8 L 173.3,24.0 L 192.0,31.8 L 205.0,41.1 L 217.0,53.3 L 226.1,68.0 L 221.8,83.2 L 211.7,98.4 L 201.6,111.6 L 186.7,122.8 L 173.8,130.2 L 161.3,138.0 L 157.9,148.3 L 166.6,158.1 L 180.0,166.4 L 195.8,175.7 L 207.4,184.0 L 219.4,181.1 L 198.2,214.3 L 179.5,221.2 L 136.3,222.2 L 114.2,219.7 L 91.2,219.7 L 69.6,219.2 L 47.0,219.2 L 32.6,219.2 L 17.8,204.6 L 14.4,186.0 L 20.2,172.7 L 30.2,156.1 L 36.0,140.0 L 43.7,125.3 L 47.0,107.7 L 45.1,91.5 L 55.2,81.7 L 66.2,71.9 L 76.3,63.1 L 87.8,51.4 L 105.1,37.7 L 119.0,23.0 Z";
 
   const zoneRings = zoneRadii.map((r,i)=>`
     <circle cx="${CX}" cy="${CY}" r="${r}" fill="${zoneDefs[i].color}"
@@ -1035,21 +1022,16 @@ function exportChartsPDF() {
     </div>`;
   }).join('');
 
-  const mapSVG = `<svg viewBox="0 0 250 230" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
-    <rect width="250" height="230" fill="#e8f4f8" rx="4"/>
-    <!-- Zone rings behind state -->
-    ${zoneRings}
-    <!-- Michigan Lower Peninsula -->
-    <path d="${MI_PATH}" fill="#c8dbe8" stroke="#5a8fa8" stroke-width="1" fill-rule="evenodd"/>
-    <!-- Marlette marker -->
-    <circle cx="${CX}" cy="${CY}" r="4" fill="#C41230" stroke="#fff" stroke-width="1.5"/>
-    <text x="${CX+6}" y="${CY+4}" font-size="7" font-family="Arial" fill="#C41230" font-weight="bold">Marlette</text>
-    <!-- Zone distance labels on rings -->
-    ${[10,25,50,75,100].map((m,i)=>`<text x="${CX}" y="${CY - zoneRadii[i] - 2}" text-anchor="middle" font-size="6" font-family="Arial" fill="${zoneDefs[i].color}" font-weight="bold">${m}mi</text>`).join('')}
-  </svg>`;
+  // Map is captured from live Leaflet element via html2canvas
 
-  const win = window.open('', '_blank');
-  if (!win) { alert('Allow pop-ups to export the PDF.'); return; }
+  // Capture live Leaflet map as image, then build PDF
+  const mapEl = document.getElementById('deliveryMap');
+  async function buildPDF(mapDataUrl) {
+    const win = window.open('', '_blank');
+    if (!win) { alert('Allow pop-ups to export the PDF.'); return; }
+    const mapImgTag = mapDataUrl
+      ? `<img src="${mapDataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="Delivery map"/>`
+      : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:11px">Map unavailable</div>`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Delivery Report ${start||''} – ${end||''}</title>
   <style>
     @page { size: landscape; margin: 10mm 12mm; }
@@ -1134,7 +1116,7 @@ function exportChartsPDF() {
 
     <h2>Delivery Zone Distribution <span class="hint">based on delivery distance from Marlette, MI</span></h2>
     <div class="map-section">
-      <div class="map-svg-wrap">${mapSVG}</div>
+      <div class="map-svg-wrap">${mapImgTag}</div>
       <div class="zone-legend">
         <h3>Stops by Radius Zone — ${zoneTotal} stops with distance data</h3>
         ${zoneLabels}
@@ -1185,9 +1167,19 @@ function exportChartsPDF() {
       <span>BCC Delivery Report &nbsp;·&nbsp; ${start||''} – ${end||''}</span>
     </div>
   </body></html>`;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } // end buildPDF
+
+  // Capture the live Leaflet map via html2canvas, fall back gracefully
+  if (mapEl && typeof html2canvas !== 'undefined') {
+    html2canvas(mapEl, { useCORS: true, allowTaint: true, scale: 1.5, logging: false })
+      .then(canvas => buildPDF(canvas.toDataURL('image/jpeg', 0.85)))
+      .catch(() => buildPDF(null));
+  } else {
+    buildPDF(null);
+  }
 }
 
 /* ── COLLAPSIBLE ── */
