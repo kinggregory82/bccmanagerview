@@ -521,7 +521,7 @@ function metrics(stops){
   const comp=stops.filter(isComplete),pend=stops.filter(s=>!isComplete(s));
   const ph=comp.filter(hasPhoto),sms=stops.filter(hasSms);
   // Only include stops that actually have timing data (field set or arrival+eta available)
-  const hasTimingData=s=>s.timing||((s.arrivalTime||s.completedAt)&&(s.calculatedEta||s.seedEta));
+  const hasTimingData=s=>s.timing||((s.arrivalTime||s.completedAt)&&(s.seedEta||s.calculatedEta));
   const compWithTiming=comp.filter(hasTimingData);
   const late=compWithTiming.filter(s=>{if(s.timing==='late')return true;if(s.timing==='early'||s.timing==='ontime')return false;const ml=minutesLate(s);return ml!==null&&ml>30;});
   const ontime=compWithTiming.filter(s=>{if(s.timing==='early'||s.timing==='ontime')return true;if(s.timing==='late')return false;const ml=minutesLate(s);return ml!==null&&ml<=30;});
