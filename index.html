@@ -109,8 +109,10 @@ input[type=date]#datePicker{background:none;border:none;font-family:'IBM Plex Mo
 
 /* ── KPI ROW ── */
 .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border)}
-.kpi{background:var(--panel);padding:12px 14px;border-top:2px solid transparent;position:relative}
+.kpi{background:var(--panel);padding:12px 14px;border-top:2px solid transparent;position:relative;transition:background .15s ease}
+.kpi:hover{background:var(--panel2)}
 .kpi.red{border-top-color:var(--red)}
+.kpi.red::before{content:'';position:absolute;top:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--red-dim),var(--red),#ff5a5a);box-shadow:0 0 8px rgba(232,48,48,.5)}
 .kpi.green{border-top-color:var(--green)}
 .kpi.white{border-top-color:var(--white)}
 .kpi-label{font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
@@ -158,9 +160,12 @@ tbody tr:hover{background:var(--panel2)}
 /* ── ISSUE COLLAPSIBLE ── */
 .issue-cat{border-bottom:1px solid var(--border)}
 .issue-cat:last-child{border-bottom:none}
-.issue-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer}
+.issue-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;cursor:pointer;transition:background .12s ease}
 .issue-hdr:hover{background:var(--panel2)}
+.issue-hdr:hover .expand-hint{color:var(--red)}
 .issue-hdr-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--muted)}
+.expand-hint{font-size:10px;font-weight:600;letter-spacing:.4px;color:var(--dim);text-transform:uppercase;transition:color .12s ease}
+.issue-body.open ~ * .expand-hint,.issue-cat .issue-body.open{}
 .issue-hdr-right{display:flex;align-items:center;gap:7px}
 .issue-count{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700}
 .chevron{font-size:12px;color:var(--dim);transition:transform .2s}
@@ -177,7 +182,7 @@ tbody tr:hover{background:var(--panel2)}
 .fleet-asset{font-size:13px;font-weight:700;color:var(--white);font-family:'IBM Plex Mono',monospace}
 .fleet-driver{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fleet-bar{height:3px;background:var(--border2);margin:7px 0 4px}
-.fleet-fill{height:100%;background:var(--red);transition:width .4s}
+.fleet-fill{height:100%;background:linear-gradient(90deg,var(--red-dim),var(--red),#ff5a5a);box-shadow:0 0 6px rgba(232,48,48,.4);transition:width .4s}
 .fleet-meta{font-size:12px;color:var(--dim);display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace}
 
 /* ── REPORT SECTION ── */
@@ -187,19 +192,26 @@ tbody tr:hover{background:var(--panel2)}
 .report-kpi-val{font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--white)}
 .report-kpi-sub{font-size:12px;color:var(--dim);margin-top:2px}
 .report-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+/* report sections: results table left, chart right */
+.report-section{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:start;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.report-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.report-results{min-width:0;overflow-x:auto}
+.report-chart-col{min-width:0}
+.report-sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
+.report-chart{position:relative;height:240px;background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:10px}
 .report-range{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
 .report-range label{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
 .report-range input[type=date]{background:var(--panel);border:1px solid var(--border);color:var(--white);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:4px 8px;border-radius:2px}
 .report-range input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5)}
-.run-btn{background:var(--red);color:#fff;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;padding:5px 14px;border-radius:2px;cursor:pointer;letter-spacing:.3px;margin-left:auto}
-.run-btn:hover{background:#c01818}
+.run-btn{background:linear-gradient(135deg,var(--red),#b81818);color:#fff;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:700;padding:5px 14px;border-radius:2px;cursor:pointer;letter-spacing:.3px;margin-left:auto;box-shadow:0 2px 8px rgba(232,48,48,.3);transition:all .15s ease}
+.run-btn:hover{background:linear-gradient(135deg,#ff3a3a,#c01818);box-shadow:0 3px 12px rgba(232,48,48,.45)}
 
 /* ── CHART ── */
 .chart-wrap{position:relative;height:160px;padding:10px 14px 14px}
 
 .empty{padding:18px 14px;text-align:center;font-size:13px;color:var(--dim);font-family:'IBM Plex Mono',monospace}
 
-@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr)}.g-65-35{grid-template-columns:1fr}.g-50-50{grid-template-columns:1fr}.fleet-grid{grid-template-columns:repeat(2,1fr)}.report-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr)}.g-65-35{grid-template-columns:1fr}.g-50-50{grid-template-columns:1fr}.fleet-grid{grid-template-columns:repeat(2,1fr)}.report-grid{grid-template-columns:1fr}.report-section{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -293,23 +305,23 @@ tbody tr:hover{background:var(--panel2)}
             <div class="ph"><span class="pt">Issues</span><span class="pn" id="issuesMeta">—</span></div>
             <div class="issue-cat">
               <div class="issue-hdr" onclick="toggleCat(this)">
-                <span class="issue-hdr-label">Late Deliveries</span>
+                <span class="issue-hdr-label">Late Deliveries <span class="expand-hint">— Click Here To Expand</span></span>
                 <div class="issue-hdr-right">
                   <span class="issue-count" id="late-count" style="color:var(--red)">—</span>
-                  <span class="chevron open">▾</span>
+                  <span class="chevron">▾</span>
                 </div>
               </div>
-              <div class="issue-body open" id="late-body"><div class="empty">Loading…</div></div>
+              <div class="issue-body" id="late-body"><div class="empty">Loading…</div></div>
             </div>
             <div class="issue-cat">
               <div class="issue-hdr" onclick="toggleCat(this)">
-                <span class="issue-hdr-label">No Photo on Delivery</span>
+                <span class="issue-hdr-label">No Photo on Delivery <span class="expand-hint">— Click Here To Expand</span></span>
                 <div class="issue-hdr-right">
                   <span class="issue-count" id="nophoto-count" style="color:var(--amber)">—</span>
-                  <span class="chevron open">▾</span>
+                  <span class="chevron">▾</span>
                 </div>
               </div>
-              <div class="issue-body open" id="nophoto-body"><div class="empty">Loading…</div></div>
+              <div class="issue-body" id="nophoto-body"><div class="empty">Loading…</div></div>
             </div>
           </div>
 
@@ -383,6 +395,7 @@ tbody tr:hover{background:var(--panel2)}
           <label style="margin-left:8px">To</label>
           <input type="date" id="reportEnd">
           <button class="run-btn" onclick="runReport()">Run Report</button>
+          <button class="run-btn" id="exportPdfBtn" onclick="exportChartsPDF()" style="display:none;margin-left:8px;background:linear-gradient(135deg,#333,#1a1a1a);box-shadow:none">Export Charts PDF</button>
         </div>
         <div id="reportContent"><div class="empty">Set a date range and click Run Report</div></div>
       </div>
@@ -458,8 +471,11 @@ function cityFromAddress(addr){
 
 /* ── DISPATCH PIN BYPASS ── */
 function goDispatch(){
-  sessionStorage.setItem('bcc_mgr_pin',DISPATCH_PIN);
-  window.open(DISPATCH_URL,'_blank');
+  // sessionStorage isn't shared across tabs opened with window.open, so pass the
+  // PIN as a URL parameter; the dispatcher reads it on load and auto-authenticates.
+  sessionStorage.setItem('bcc_mgr_pin',DISPATCH_PIN); // kept for backwards-compat
+  const sep = DISPATCH_URL.includes('?') ? '&' : '?';
+  window.open(`${DISPATCH_URL}${sep}pin=${encodeURIComponent(DISPATCH_PIN)}`,'_blank');
 }
 
 /* ── TABS ── */
@@ -793,60 +809,189 @@ function runReport(){
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
     Period: ${start} → ${end} &nbsp;|&nbsp; ${allStops.length} stops &nbsp;|&nbsp; ${M.complete} delivered &nbsp;|&nbsp; On Time: ${M.ontimePct!==null?M.ontimePct+'%':'—'} &nbsp;|&nbsp; Photos: ${M.photoPct!==null?M.photoPct+'%':'—'}
   </div>
-  <div class="report-grid" style="padding:14px">
-    <div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Driver Performance</div>
-      <table>
-        <thead><tr><th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Avg Late</th></tr></thead>
-        <tbody>
-        ${driversReport.map(d=>{
-          const otp=d.c?Math.round(d.ot/d.c*100):null;
-          const php=d.c?Math.round(d.ph/d.c*100):null;
-          const avgStop=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length)+'m':'—';
-          const avgLate=d.lateMin.length>0?'+'+Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length)+'m':'—';
-          return`<tr>
-            <td><div class="tbl-primary">${d.name}</div></td>
-            <td>${d.c}/${d.t}</td>
-            <td style="color:${pctColor(otp,80,60)};font-weight:600">${otp!==null?otp+'%':'—'}</td>
-            <td style="color:${pctColor(php,90,70)};font-weight:600">${php!==null?php+'%':'—'}</td>
-            <td>${avgStop}</td>
-            <td style="color:${avgLate!=='—'?'var(--red)':'var(--dim)'}">${avgLate}</td>
-          </tr>`;
-        }).join('')}
-        </tbody>
-      </table>
+  <div style="padding:14px">
+    <!-- DRIVER PERFORMANCE: results left, chart right -->
+    <div class="report-section">
+      <div class="report-results">
+        <div class="report-sec-title">Driver Performance</div>
+        <table>
+          <thead><tr><th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Avg Late</th></tr></thead>
+          <tbody>
+          ${driversReport.map(d=>{
+            const otp=d.c?Math.round(d.ot/d.c*100):null;
+            const php=d.c?Math.round(d.ph/d.c*100):null;
+            const avgStop=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length)+'m':'—';
+            const avgLate=d.lateMin.length>0?'+'+Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length)+'m':'—';
+            return`<tr>
+              <td><div class="tbl-primary">${d.name}</div></td>
+              <td>${d.c}/${d.t}</td>
+              <td style="color:${pctColor(otp,80,60)};font-weight:600">${otp!==null?otp+'%':'—'}</td>
+              <td style="color:${pctColor(php,90,70)};font-weight:600">${php!==null?php+'%':'—'}</td>
+              <td>${avgStop}</td>
+              <td style="color:${avgLate!=='—'?'var(--red)':'var(--dim)'}">${avgLate}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="report-chart-col">
+        <div class="report-sec-title">On-Time % by Driver</div>
+        <div class="report-chart"><canvas id="driverChart"></canvas></div>
+      </div>
     </div>
-    <div>
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">By Sales Rep</div>
-      <table>
-        <thead><tr><th>Rep</th><th>Total</th><th>Done</th><th>%</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
-        <tbody>
-        ${salesReport.map(s=>{
-          const cp=s.t?Math.round(s.c/s.t*100):0;
-          const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
-          const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
-          const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
-          const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
-          return`<tr>
-            <td style="font-weight:600;color:var(--white)">${s.rep}</td>
-            <td>${s.t}</td><td>${s.c}</td>
-            <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
-            <td style="color:var(--muted)">${milesStr}</td>
-            <td style="color:var(--green);font-weight:600">${fmtM(s.invoiceTotal)}</td>
-            <td style="color:var(--muted)">${fmtM(avgInv)}</td>
-            <td style="color:var(--amber);font-weight:600">${invPerMile}</td>
-          </tr>`;
-        }).join('')}
-        </tbody>
-      </table>
+
+    <!-- BY SALES REP: results left, chart right -->
+    <div class="report-section">
+      <div class="report-results">
+        <div class="report-sec-title">By Sales Rep</div>
+        <table>
+          <thead><tr><th>Rep</th><th>Total</th><th>Done</th><th>%</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
+          <tbody>
+          ${salesReport.map(s=>{
+            const cp=s.t?Math.round(s.c/s.t*100):0;
+            const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
+            const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+            const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
+            const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
+            return`<tr>
+              <td style="font-weight:600;color:var(--white)">${s.rep}</td>
+              <td>${s.t}</td><td>${s.c}</td>
+              <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
+              <td style="color:var(--muted)">${milesStr}</td>
+              <td style="color:var(--green);font-weight:600">${fmtM(s.invoiceTotal)}</td>
+              <td style="color:var(--muted)">${fmtM(avgInv)}</td>
+              <td style="color:var(--amber);font-weight:600">${invPerMile}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="report-chart-col">
+        <div class="report-sec-title">Total Invoice by Rep</div>
+        <div class="report-chart"><canvas id="salesChart"></canvas></div>
+      </div>
     </div>
   </div>`;
+
+  // Render the charts and stash data for PDF export
+  renderReportCharts(driversReport, salesReport, start, end, M, allStops.length);
+  document.getElementById('exportPdfBtn').style.display = 'inline-block';
+}
+
+// Holds the live Chart.js instances + meta for PDF export
+let _reportCharts = { driver: null, sales: null, meta: null };
+
+function renderReportCharts(driversReport, salesReport, start, end, M, totalStops) {
+  // Destroy any prior charts to avoid canvas reuse errors
+  if (_reportCharts.driver) { _reportCharts.driver.destroy(); _reportCharts.driver = null; }
+  if (_reportCharts.sales)  { _reportCharts.sales.destroy();  _reportCharts.sales  = null; }
+
+  const gridColor = 'rgba(255,255,255,0.08)';
+  const tickColor = '#aaaaaa';
+  const redGrad   = 'rgba(232,48,48,0.85)';
+  const greenGrad = 'rgba(46,204,113,0.85)';
+
+  const commonOpts = (titleText) => ({
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      title: { display: false },
+      tooltip: { enabled: true },
+      datalabels: { display: false },
+    },
+    scales: {
+      x: { ticks: { color: tickColor, font: { size: 11 } }, grid: { color: gridColor } },
+      y: { beginAtZero: true, ticks: { color: tickColor, font: { size: 11 } }, grid: { color: gridColor } },
+    },
+    animation: { duration: 400 },
+  });
+
+  // Driver on-time % chart
+  const dCtx = document.getElementById('driverChart');
+  if (dCtx) {
+    const labels = driversReport.map(d => d.name.split(' ')[0] || d.name);
+    const data = driversReport.map(d => d.c ? Math.round(d.ot / d.c * 100) : 0);
+    _reportCharts.driver = new Chart(dCtx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'On-Time %', data, backgroundColor: redGrad, borderColor: '#ff5a5a', borderWidth: 1, maxBarThickness: 46 }] },
+      options: { ...commonOpts(), scales: { ...commonOpts().scales, y: { ...commonOpts().scales.y, max: 100, ticks: { color: tickColor, callback: v => v + '%' } } } },
+    });
+  }
+
+  // Sales total-invoice chart
+  const sCtx = document.getElementById('salesChart');
+  if (sCtx) {
+    const labels = salesReport.map(s => s.rep);
+    const data = salesReport.map(s => Math.round(s.invoiceTotal || 0));
+    _reportCharts.sales = new Chart(sCtx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Total Invoice', data, backgroundColor: greenGrad, borderColor: '#43e08a', borderWidth: 1, maxBarThickness: 46 }] },
+      options: { ...commonOpts(), scales: { ...commonOpts().scales, y: { ...commonOpts().scales.y, ticks: { color: tickColor, callback: v => '$' + (v/1000) + 'k' } } } },
+    });
+  }
+
+  _reportCharts.meta = { start, end, totalStops, complete: M.complete, ontimePct: M.ontimePct, photoPct: M.photoPct,
+                         driverLabels: driversReport.map(d => d.name), salesLabels: salesReport.map(s => s.rep) };
+}
+
+// Export a LANDSCAPE PDF containing ONLY the charts with high-level data points.
+function exportChartsPDF() {
+  if (!_reportCharts.driver || !_reportCharts.sales) { alert('Run a report first.'); return; }
+  const m = _reportCharts.meta || {};
+  // Grab chart images at high resolution
+  const driverImg = _reportCharts.driver.toBase64Image('image/png', 1);
+  const salesImg  = _reportCharts.sales.toBase64Image('image/png', 1);
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('Allow pop-ups to export the PDF.'); return; }
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Report Charts ${m.start||''} to ${m.end||''}</title>
+  <style>
+    @page { size: landscape; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 18px 22px; }
+    .hdr { border-bottom: 3px solid #C41230; padding-bottom: 10px; margin-bottom: 16px; display:flex; justify-content:space-between; align-items:flex-end; }
+    .hdr h1 { font-size: 22px; letter-spacing: 1px; color: #C41230; margin: 0; text-transform: uppercase; }
+    .hdr .period { font-size: 13px; color: #444; }
+    .kpis { display:flex; gap: 26px; margin-bottom: 18px; }
+    .kpi { font-size: 13px; color:#333; }
+    .kpi b { display:block; font-size: 22px; color:#111; }
+    .chart-block { margin-bottom: 22px; page-break-inside: avoid; }
+    .chart-block h2 { font-size: 15px; color:#222; margin: 0 0 8px; border-left: 4px solid #C41230; padding-left: 8px; text-transform: uppercase; letter-spacing:.5px; }
+    .chart-block img { width: 100%; max-height: 320px; object-fit: contain; border: 1px solid #ddd; padding: 8px; background:#fff; }
+    .foot { margin-top: 14px; font-size: 10px; color:#999; text-align:right; }
+  </style></head>
+  <body onload="window.print()">
+    <div class="hdr">
+      <h1>BCC Delivery Report</h1>
+      <div class="period">Period: ${m.start||''} &nbsp;→&nbsp; ${m.end||''}</div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><b>${m.totalStops||0}</b>Total Stops</div>
+      <div class="kpi"><b>${m.complete||0}</b>Delivered</div>
+      <div class="kpi"><b>${m.ontimePct!=null?m.ontimePct+'%':'—'}</b>On Time</div>
+      <div class="kpi"><b>${m.photoPct!=null?m.photoPct+'%':'—'}</b>Photos</div>
+    </div>
+    <div class="chart-block">
+      <h2>On-Time % by Driver</h2>
+      <img src="${driverImg}">
+    </div>
+    <div class="chart-block">
+      <h2>Total Invoice by Sales Rep</h2>
+      <img src="${salesImg}">
+    </div>
+    <div class="foot">Generated ${new Date().toLocaleString()} · Ben's Contractor Center</div>
+  </body></html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
 
 /* ── COLLAPSIBLE ── */
 function toggleCat(hdr){
   const ch=hdr.querySelector('.chevron'),body=hdr.nextElementSibling;
   const open=body.classList.toggle('open');ch.classList.toggle('open',open);
+  const hint=hdr.querySelector('.expand-hint');
+  if(hint)hint.textContent=open?'— Click To Collapse':'— Click Here To Expand';
   if(leafletMap)setTimeout(()=>leafletMap.invalidateSize(),250);
 }
 
