@@ -832,11 +832,53 @@ function runReport(){
     return`<span class="rank">${i+1}</span>`;
   };
 
+  // ── Zone bucketing for on-screen map ──
+  const _zoneDefs = [
+    { label:'0 – 10 mi',  max:10,  color:'#c0392b' },
+    { label:'10 – 25 mi', max:25,  color:'#e67e22' },
+    { label:'25 – 50 mi', max:50,  color:'#27ae60' },
+    { label:'50 – 75 mi', max:75,  color:'#2980b9' },
+    { label:'75 – 100 mi',max:100, color:'#8e44ad' },
+    { label:'100+ mi',    max:Infinity, color:'#7f8c8d' },
+  ];
+  const _zoneCounts = _zoneDefs.map(()=>0);
+  let _zoneTotal = 0;
+  allStops.forEach(s=>{
+    const d = s._distanceMiles||0;
+    if(d<=0) return;
+    _zoneTotal++;
+    for(let i=0;i<_zoneDefs.length;i++){
+      if(d<=_zoneDefs[i].max){ _zoneCounts[i]++; break; }
+    }
+  });
+  const _zoneRows = _zoneDefs.map((z,i)=>{
+    const pct = _zoneTotal>0 ? Math.round(_zoneCounts[i]/_zoneTotal*100) : 0;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12px">
+      <div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${z.color}"></div>
+      <div style="width:90px;color:var(--muted);flex-shrink:0">${z.label}</div>
+      <div style="flex:1;background:rgba(255,255,255,0.08);border-radius:3px;height:10px;overflow:hidden">
+        <div style="width:${pct}%;height:10px;border-radius:3px;background:${z.color};min-width:${pct>0?2:0}px"></div>
+      </div>
+      <div style="width:36px;text-align:right;font-weight:700;color:var(--white)">${pct}%</div>
+      <div style="width:42px;color:var(--dim)">(${_zoneCounts[i]})</div>
+    </div>`;
+  }).join('');
+
   cont.innerHTML=`
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
     Period: ${start} → ${end} &nbsp;|&nbsp; ${allStops.length} stops &nbsp;|&nbsp; ${M.complete} delivered &nbsp;|&nbsp; On Time: ${M.ontimePct!==null?M.ontimePct+'%':'—'} &nbsp;|&nbsp; Photos: ${M.photoPct!==null?M.photoPct+'%':'—'}
   </div>
   <div style="padding:14px">
+
+    <!-- DELIVERY ZONE DISTRIBUTION -->
+    <div class="report-section">
+      <div class="report-sec-title">Delivery Zone Distribution &nbsp;<span class="rank-hint">by distance from Marlette, MI · ${_zoneTotal} stops with distance data</span></div>
+      <div style="display:flex;gap:24px;align-items:flex-start;margin-top:10px">
+        <div id="rpt-map-wrap" style="width:220px;min-width:220px;height:190px;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:var(--panel2)"></div>
+        <div style="flex:1;padding-top:4px">${_zoneRows}</div>
+      </div>
+    </div>
+
     <!-- DRIVER PERFORMANCE — ranked best→worst, color-coded cells -->
     <div class="report-section">
       <div class="report-sec-title">Driver Performance &nbsp;<span class="rank-hint">ranked best → worst</span></div>
@@ -895,6 +937,23 @@ function runReport(){
   // Stash report data for the PDF export
   _reportData = { driversReport, salesReport, start, end, M, totalStops: allStops.length, allStops };
   document.getElementById('exportPdfBtn').style.display = 'inline-block';
+
+  // Snapshot the live Leaflet map into the on-screen report zone panel
+  setTimeout(()=>{
+    const src = document.getElementById('deliveryMap');
+    const dst = document.getElementById('rpt-map-wrap');
+    if (src && dst && typeof html2canvas !== 'undefined') {
+      html2canvas(src, { useCORS:true, allowTaint:true, scale:1.5, logging:false })
+        .then(canvas => {
+          const img = document.createElement('img');
+          img.src = canvas.toDataURL('image/jpeg', 0.85);
+          img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:6px';
+          dst.innerHTML = '';
+          dst.appendChild(img);
+        })
+        .catch(()=>{ dst.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:11px">Map unavailable</div>'; });
+    }
+  }, 400);
 }
 
 // Holds the last report's computed data for the PDF export
@@ -903,50 +962,36 @@ let _reportData = null;
 // Export a clean LANDSCAPE PDF of the ranked, color-coded tables.
 function exportChartsPDF() {
   if (!_reportData) { alert('Run a report first.'); return; }
-  const { driversReport, salesReport, start, end, M, totalStops } = _reportData;
+  const { driversReport, salesReport, start, end, M, totalStops, allStops } = _reportData;
 
-  // Absolute thresholds — driver metrics have known good/bad bands.
   const bg   =(v,g,w)=>{ if(v===null||v===undefined)return''; if(v>=g)return'background:#d4edda;color:#155724'; if(v>=w)return'background:#fff3cd;color:#856404'; return'background:#f8d7da;color:#721c24'; };
   const bgInv=(v,g,w)=>{ if(v===null||v===undefined)return''; if(v<=g)return'background:#d4edda;color:#155724'; if(v<=w)return'background:#fff3cd;color:#856404'; return'background:#f8d7da;color:#721c24'; };
-
-  // Relative thresholds — sales invoices vary too much by territory for fixed bands.
-  // Top third = green, middle third = yellow, bottom third = red. Reps with no
-  // invoice data (—) are de-emphasised with a grey background.
   function bgRel(val, allVals) {
-    if (val === null || val === undefined || val === 0) return 'background:#f5f5f5;color:#aaa';
+    if (!val || val===0) return 'background:#f5f5f5;color:#aaa';
     const sorted = allVals.filter(v=>v>0).sort((a,b)=>a-b);
     if (!sorted.length) return '';
-    const lo = sorted[Math.floor(sorted.length/3)];
-    const hi = sorted[Math.floor(sorted.length*2/3)];
-    if (val >= hi) return 'background:#d4edda;color:#155724;font-weight:700';
-    if (val >= lo) return 'background:#fff3cd;color:#856404;font-weight:700';
+    const lo=sorted[Math.floor(sorted.length/3)], hi=sorted[Math.floor(sorted.length*2/3)];
+    if (val>=hi) return 'background:#d4edda;color:#155724;font-weight:700';
+    if (val>=lo) return 'background:#fff3cd;color:#856404;font-weight:700';
     return 'background:#f8d7da;color:#721c24;font-weight:700';
   }
-
-  const fmtM = v => v > 0 ? '$' + Math.round(v).toLocaleString('en-US') : '—';
-
-  // Pre-compute sales value arrays for relative coloring
-  const allInvTotals  = salesReport.map(s=>s.invoiceTotal||0);
-  const allAvgInvs    = salesReport.map(s=>s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0);
-  const allPerMiles   = salesReport.map(s=>s.miles>0&&s.invoiceTotal>0?Math.round(s.invoiceTotal/s.miles):0);
-
-  // Overall stats for KPI bar
-  const totalMiles    = salesReport.reduce((a,s)=>a+(s.miles||0),0);
-  const totalInvoice  = salesReport.reduce((a,s)=>a+(s.invoiceTotal||0),0);
-  const allStopMins   = driversReport.flatMap(d=>d.stopMins||[]);
-  const overallAvgStop= allStopMins.length ? Math.round(allStopMins.reduce((a,b)=>a+b,0)/allStopMins.length) : null;
+  const fmtM = v => v>0 ? '$'+Math.round(v).toLocaleString('en-US') : '—';
+  const allInvTotals = salesReport.map(s=>s.invoiceTotal||0);
+  const allAvgInvs   = salesReport.map(s=>s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0);
+  const allPerMiles  = salesReport.map(s=>s.miles>0&&s.invoiceTotal>0?Math.round(s.invoiceTotal/s.miles):0);
+  const totalMiles   = salesReport.reduce((a,s)=>a+(s.miles||0),0);
+  const totalInvoice = salesReport.reduce((a,s)=>a+(s.invoiceTotal||0),0);
+  const allStopMins  = driversReport.flatMap(d=>d.stopMins||[]);
+  const overallAvgStop = allStopMins.length ? Math.round(allStopMins.reduce((a,b)=>a+b,0)/allStopMins.length) : null;
 
   const driverRows = driversReport.map((d,i)=>{
-    const otp      = d.c ? Math.round(d.ot/d.c*100) : null;
-    const php      = d.c ? Math.round(d.ph/d.c*100) : null;
-    const avgStopN = d.stopMins.length>0 ? Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length) : null;
-    const avgLateN = d.lateMin.length>0  ? Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length)  : null;
-    const lateCount= d.lateMin.length;
-    const rowStyle = i===0 ? 'background:#fffbf0' : (i%2===0?'background:#fafafa':'');
+    const otp=d.c?Math.round(d.ot/d.c*100):null, php=d.c?Math.round(d.ph/d.c*100):null;
+    const avgStopN=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length):null;
+    const avgLateN=d.lateMin.length>0?Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length):null;
+    const lateCount=d.lateMin.length;
+    const rowStyle=i===0?'background:#fffbf0':(i%2===0?'background:#fafafa':'');
     return `<tr style="${rowStyle}">
-      <td class="rk">${i+1}</td>
-      <td class="nm">${d.name}</td>
-      <td>${d.c}/${d.t}</td>
+      <td class="rk">${i+1}</td><td class="nm">${d.name}</td><td>${d.c}/${d.t}</td>
       <td style="${bg(otp,80,60)}">${otp!==null?otp+'%':'—'}</td>
       <td style="${bg(php,90,70)}">${php!==null?php+'%':'—'}</td>
       <td style="${bgInv(avgStopN,20,35)}">${avgStopN!==null?avgStopN+'m':'—'}</td>
@@ -956,230 +1001,139 @@ function exportChartsPDF() {
   }).join('');
 
   const salesRows = salesReport.map((s,i)=>{
-    const cp       = s.t ? Math.round(s.c/s.t*100) : 0;
-    const avgInv   = s.invoiceCount>0 ? s.invoiceTotal/s.invoiceCount : 0;
-    const perMileN = s.miles>0&&s.invoiceTotal>0 ? Math.round(s.invoiceTotal/s.miles) : null;
-    const milesStr = s.miles>0 ? Math.round(s.miles).toLocaleString()+'mi' : '—';
-    const noData   = !s.invoiceTotal;
-    const rowStyle = noData ? 'opacity:0.55' : (i%2===0?'background:#fafafa':'');
-    return `<tr style="${rowStyle}">
-      <td class="rk">${i+1}</td>
-      <td class="nm">${s.rep}</td>
-      <td>${s.c}/${s.t}</td>
-      <td style="${bg(cp,90,75)}">${cp}%</td>
-      <td>${milesStr}</td>
+    const cp=s.t?Math.round(s.c/s.t*100):0;
+    const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+    const perMileN=s.miles>0&&s.invoiceTotal>0?Math.round(s.invoiceTotal/s.miles):null;
+    const milesStr=s.miles>0?Math.round(s.miles).toLocaleString()+'mi':'—';
+    const noData=!s.invoiceTotal;
+    return `<tr style="${noData?'opacity:0.55':(i%2===0?'background:#fafafa':'')}">
+      <td class="rk">${i+1}</td><td class="nm">${s.rep}</td><td>${s.c}/${s.t}</td>
+      <td style="${bg(cp,90,75)}">${cp}%</td><td>${milesStr}</td>
       <td style="${bgRel(s.invoiceTotal,allInvTotals)}">${fmtM(s.invoiceTotal)}</td>
       <td style="${bgRel(avgInv,allAvgInvs)}">${fmtM(avgInv)}</td>
       <td style="${bgRel(perMileN,allPerMiles)}">${perMileN!==null?'$'+perMileN:'—'}</td>
     </tr>`;
   }).join('');
 
-  // ── Delivery zone bucketing (from PPTX radius map) ──
-  // Zones: 0-10mi, 10-25mi, 25-50mi, 50-75mi, 75-100mi, 100mi+
-  const { allStops } = _reportData;
-  const zoneDefs = [
-    { label:'0 – 10 mi',  max:10,  color:'#c0392b', textColor:'#fff' },
-    { label:'10 – 25 mi', max:25,  color:'#e67e22', textColor:'#fff' },
-    { label:'25 – 50 mi', max:50,  color:'#27ae60', textColor:'#fff' },
-    { label:'50 – 75 mi', max:75,  color:'#2980b9', textColor:'#fff' },
-    { label:'75 – 100 mi',max:100, color:'#8e44ad', textColor:'#fff' },
-    { label:'100+ mi',    max:Infinity, color:'#7f8c8d', textColor:'#fff' },
+  // Zone bucketing for PDF map section
+  const zoneDefs=[
+    {label:'0 – 10 mi',max:10,color:'#c0392b'},{label:'10 – 25 mi',max:25,color:'#e67e22'},
+    {label:'25 – 50 mi',max:50,color:'#27ae60'},{label:'50 – 75 mi',max:75,color:'#2980b9'},
+    {label:'75 – 100 mi',max:100,color:'#8e44ad'},{label:'100+ mi',max:Infinity,color:'#7f8c8d'},
   ];
-  const zoneCounts = zoneDefs.map(()=>0);
-  let zoneTotal = 0;
-  (allStops||[]).forEach(s=>{
-    const d = s._distanceMiles||0;
-    if(d<=0) return;
-    zoneTotal++;
-    for(let i=0;i<zoneDefs.length;i++){
-      if(d<=zoneDefs[i].max){ zoneCounts[i]++; break; }
-    }
-  });
-
-  // Michigan Lower Peninsula — real geographic projection
-  // ViewBox 240x230, lon -87.2..-82.2, lat 41.55..46.25
-  // Marlette MI (43.3218N, 83.0836W) → (197.6, 143.3)
-  const CX = 197.6, CY = 143.3;
-  const MILE_PX = 0.709;
-  const zoneRadii = [10,25,50,75,100].map(m=>Math.round(m*MILE_PX));
-
-  const LP_D = "M 119.0,23.0 L 123.8,29.9 L 131.5,34.3 L 147.4,36.7 L 161.3,33.8 L 173.3,24.0 L 192.0,31.8 L 205.0,41.1 L 217.0,53.3 L 226.1,68.0 L 221.8,83.2 L 211.7,98.4 L 201.6,111.6 L 186.7,122.8 L 173.8,130.2 L 161.3,138.0 L 157.9,148.3 L 166.6,158.1 L 180.0,166.4 L 195.8,175.7 L 207.4,184.0 L 219.4,181.1 L 198.2,214.3 L 179.5,221.2 L 136.3,222.2 L 114.2,219.7 L 91.2,219.7 L 69.6,219.2 L 47.0,219.2 L 32.6,219.2 L 17.8,204.6 L 14.4,186.0 L 20.2,172.7 L 30.2,156.1 L 36.0,140.0 L 43.7,125.3 L 47.0,107.7 L 45.1,91.5 L 55.2,81.7 L 66.2,71.9 L 76.3,63.1 L 87.8,51.4 L 105.1,37.7 L 119.0,23.0 Z";
-
-  const zoneRings = zoneRadii.map((r,i)=>`
-    <circle cx="${CX}" cy="${CY}" r="${r}" fill="${zoneDefs[i].color}"
-      fill-opacity="0.13" stroke="${zoneDefs[i].color}" stroke-width="1.2" stroke-dasharray="4,3"/>
-  `).join('');
-
-  const zoneLabels = zoneDefs.map((z,i)=>{
-    const pct = zoneTotal>0 ? Math.round(zoneCounts[i]/zoneTotal*100) : 0;
-    const cnt = zoneCounts[i];
-    return `<div class="zone-row">
-      <div class="zone-swatch" style="background:${z.color}"></div>
+  const zoneCounts=zoneDefs.map(()=>0); let zoneTotal=0;
+  (allStops||[]).forEach(s=>{ const d=s._distanceMiles||0; if(d<=0)return; zoneTotal++;
+    for(let i=0;i<zoneDefs.length;i++){if(d<=zoneDefs[i].max){zoneCounts[i]++;break;}} });
+  const zoneLabels=zoneDefs.map((z,i)=>{
+    const pct=zoneTotal>0?Math.round(zoneCounts[i]/zoneTotal*100):0;
+    return `<div class="zone-row"><div class="zone-swatch" style="background:${z.color}"></div>
       <div class="zone-name">${z.label}</div>
       <div class="zone-bar-wrap"><div class="zone-bar" style="width:${pct}%;background:${z.color}"></div></div>
-      <div class="zone-pct">${pct}%</div>
-      <div class="zone-cnt">(${cnt})</div>
-    </div>`;
+      <div class="zone-pct">${pct}%</div><div class="zone-cnt">(${zoneCounts[i]})</div></div>`;
   }).join('');
 
-  // Map is captured from live Leaflet element via html2canvas
-
-  // Capture live Leaflet map as image, then build PDF
+  // Capture live map, then build PDF
   const mapEl = document.getElementById('deliveryMap');
   async function buildPDF(mapDataUrl) {
     const win = window.open('', '_blank');
     if (!win) { alert('Allow pop-ups to export the PDF.'); return; }
-    const mapImgTag = mapDataUrl
-      ? `<img src="${mapDataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="Delivery map"/>`
-      : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:11px">Map unavailable</div>`;
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Delivery Report ${start||''} – ${end||''}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Delivery Report ${start||''} – ${end||''}</title>
   <style>
-    @page { size: landscape; margin: 10mm 12mm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:0; padding:14px 18px; font-size:12px; }
-
-    /* ── Header ── */
-    .hdr { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #C41230; padding-bottom:8px; margin-bottom:12px; }
-    .hdr-left { display:flex; align-items:center; gap:14px; }
-    .hdr h1 { font-size:20px; letter-spacing:.5px; color:#C41230; margin:0; text-transform:uppercase; font-weight:900; }
-    .hdr .period { font-size:12px; color:#555; background:#f3f3f3; border:1px solid #ddd; border-radius:4px; padding:3px 10px; }
-    .hdr .generated { font-size:10px; color:#999; }
-
-    /* ── KPI strip ── */
-    .kpis { display:flex; gap:0; margin-bottom:14px; border:1px solid #ddd; border-radius:6px; overflow:hidden; }
-    .kpi { flex:1; padding:8px 14px; border-right:1px solid #e8e8e8; }
-    .kpi:last-child { border-right:none; }
-    .kpi-label { font-size:9px; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px; }
-    .kpi-val { font-size:22px; font-weight:900; color:#111; line-height:1; }
-    .kpi-val.red { color:#C41230; }
-    .kpi-val.green { color:#1a7a3a; }
-
-    /* ── Section headers ── */
-    h2 { font-size:11px; color:#fff; background:#222; margin:14px 0 0; padding:6px 10px;
-         text-transform:uppercase; letter-spacing:.8px; display:flex; justify-content:space-between; }
-    h2 .hint { font-size:9px; color:#aaa; font-weight:normal; text-transform:none; letter-spacing:0; }
-
-    /* ── Tables ── */
-    table { width:100%; border-collapse:collapse; font-size:11px; page-break-inside:avoid; }
-    th { background:#444; color:#fff; text-align:center; padding:5px 8px; font-size:9px;
-         text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
-    th.left { text-align:left; }
-    td { padding:5px 8px; border-bottom:1px solid #ebebeb; text-align:center; vertical-align:middle; }
-    td.rk { width:24px; color:#bbb; font-weight:700; font-size:10px; }
-    td.nm { text-align:left; font-weight:700; font-size:12px; }
-    tr:first-child td.rk { color:#C41230; font-size:13px; }
-
-    /* ── Legend ── */
-    .legend { display:flex; gap:16px; margin:6px 0 12px; font-size:9px; color:#666; }
-    .leg { display:flex; align-items:center; gap:4px; }
-    .leg-dot { width:10px; height:10px; border-radius:2px; }
-
-    /* ── Page break ── */
-    .break { page-break-before:always; padding-top:10px; }
-
-    /* ── Footer ── */
-    .foot { margin-top:10px; font-size:9px; color:#bbb; display:flex; justify-content:space-between; border-top:1px solid #eee; padding-top:6px; }
-
-    /* ── Delivery Zone Map ── */
-    .map-section { display:flex; gap:20px; margin:10px 0 14px; align-items:flex-start; }
-    .map-svg-wrap { width:220px; min-width:220px; height:200px; border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#e8f4f8; }
-    .zone-legend { flex:1; }
-    .zone-legend h3 { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#555; margin:0 0 8px; font-weight:700; }
-    .zone-row { display:flex; align-items:center; gap:6px; margin-bottom:5px; font-size:10px; }
-    .zone-swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
-    .zone-name { width:80px; color:#333; flex-shrink:0; }
-    .zone-bar-wrap { flex:1; background:#f0f0f0; border-radius:3px; height:10px; overflow:hidden; }
-    .zone-bar { height:10px; border-radius:3px; min-width:1px; transition:width .3s; }
-    .zone-pct { width:32px; text-align:right; font-weight:700; color:#222; }
-    .zone-cnt { width:36px; color:#999; }
-    .zone-summary { margin-top:10px; font-size:9px; color:#888; border-top:1px solid #eee; padding-top:6px; }
+    @page{size:landscape;margin:10mm 12mm}*{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;color:#111;margin:0;padding:14px 18px;font-size:12px}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #C41230;padding-bottom:8px;margin-bottom:12px}
+    .hdr h1{font-size:20px;color:#C41230;margin:0;text-transform:uppercase;font-weight:900}
+    .hdr .period{font-size:12px;color:#555;background:#f3f3f3;border:1px solid #ddd;border-radius:4px;padding:3px 10px}
+    .hdr .gen{font-size:10px;color:#999}
+    .kpis{display:flex;gap:0;margin-bottom:14px;border:1px solid #ddd;border-radius:6px;overflow:hidden}
+    .kpi{flex:1;padding:8px 14px;border-right:1px solid #e8e8e8}.kpi:last-child{border-right:none}
+    .kpi-label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+    .kpi-val{font-size:22px;font-weight:900;color:#111;line-height:1}
+    .kpi-val.red{color:#C41230}.kpi-val.green{color:#1a7a3a}
+    h2{font-size:11px;color:#fff;background:#222;margin:14px 0 0;padding:6px 10px;text-transform:uppercase;letter-spacing:.8px;display:flex;justify-content:space-between}
+    h2 .hint{font-size:9px;color:#aaa;font-weight:normal;text-transform:none;letter-spacing:0}
+    table{width:100%;border-collapse:collapse;font-size:11px;page-break-inside:avoid}
+    th{background:#444;color:#fff;text-align:center;padding:5px 8px;font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+    th.left{text-align:left}td{padding:5px 8px;border-bottom:1px solid #ebebeb;text-align:center;vertical-align:middle}
+    td.rk{width:24px;color:#bbb;font-weight:700;font-size:10px}td.nm{text-align:left;font-weight:700;font-size:12px}
+    tr:first-child td.rk{color:#C41230;font-size:13px}
+    .map-section{display:flex;gap:20px;margin:10px 0 14px;align-items:flex-start}
+    .map-svg-wrap{width:220px;min-width:220px;height:200px;border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#e8f4f8}
+    .zone-legend{flex:1}.zone-legend h3{font-size:10px;text-transform:uppercase;color:#555;margin:0 0 8px;font-weight:700}
+    .zone-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:10px}
+    .zone-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+    .zone-name{width:80px;color:#333;flex-shrink:0}
+    .zone-bar-wrap{flex:1;background:#f0f0f0;border-radius:3px;height:10px;overflow:hidden}
+    .zone-bar{height:10px;border-radius:3px;min-width:1px}
+    .zone-pct{width:32px;text-align:right;font-weight:700;color:#222}
+    .zone-cnt{width:36px;color:#999}
+    .legend{display:flex;gap:16px;margin:6px 0 12px;font-size:9px;color:#666}
+    .leg{display:flex;align-items:center;gap:4px}
+    .leg-dot{width:10px;height:10px;border-radius:2px}
+    .break{page-break-before:always;padding-top:10px}
+    .foot{margin-top:10px;font-size:9px;color:#bbb;display:flex;justify-content:space-between;border-top:1px solid #eee;padding-top:6px}
   </style></head>
   <body onload="setTimeout(function(){window.print();},300)">
-
     <div class="hdr">
-      <div class="hdr-left">
-        <h1>BCC Delivery Report</h1>
-        <div class="period">${start||''} &nbsp;→&nbsp; ${end||''}</div>
-      </div>
-      <div class="generated">Generated ${new Date().toLocaleString()}</div>
+      <h1>BCC Delivery Report</h1>
+      <div class="period">${start||''} → ${end||''}</div>
+      <div class="gen">Generated ${new Date().toLocaleString()}</div>
     </div>
-
     <div class="kpis">
       <div class="kpi"><div class="kpi-label">Total Stops</div><div class="kpi-val">${totalStops||0}</div></div>
       <div class="kpi"><div class="kpi-label">Delivered</div><div class="kpi-val">${M.complete||0}</div></div>
-      <div class="kpi"><div class="kpi-label">On Time</div><div class="kpi-val ${(M.ontimePct||0)>=80?'green':(M.ontimePct||0)>=60?'':' red'}">${M.ontimePct!=null?M.ontimePct+'%':'—'}</div></div>
+      <div class="kpi"><div class="kpi-label">On Time</div><div class="kpi-val ${(M.ontimePct||0)>=80?'green':(M.ontimePct||0)>=60?'':'red'}">${M.ontimePct!=null?M.ontimePct+'%':'—'}</div></div>
       <div class="kpi"><div class="kpi-label">Photos</div><div class="kpi-val ${(M.photoPct||0)>=90?'green':(M.photoPct||0)>=70?'':'red'}">${M.photoPct!=null?M.photoPct+'%':'—'}</div></div>
-      <div class="kpi"><div class="kpi-label">Avg Stop Time</div><div class="kpi-val">${overallAvgStop!=null?overallAvgStop+'m':'—'}</div></div>
+      <div class="kpi"><div class="kpi-label">Avg Stop</div><div class="kpi-val">${overallAvgStop!=null?overallAvgStop+'m':'—'}</div></div>
       <div class="kpi"><div class="kpi-label">Total Miles</div><div class="kpi-val">${totalMiles>0?Math.round(totalMiles).toLocaleString()+'mi':'—'}</div></div>
       <div class="kpi"><div class="kpi-label">Total Invoice</div><div class="kpi-val green">${totalInvoice>0?'$'+Math.round(totalInvoice).toLocaleString():'—'}</div></div>
     </div>
-
-    <h2>Delivery Zone Distribution <span class="hint">based on delivery distance from Marlette, MI</span></h2>
+    <h2>Delivery Zone Distribution <span class="hint">stops by distance from Marlette, MI</span></h2>
     <div class="map-section">
-      <div class="map-svg-wrap">${mapImgTag}</div>
+      <div class="map-svg-wrap"></div>
       <div class="zone-legend">
-        <h3>Stops by Radius Zone — ${zoneTotal} stops with distance data</h3>
+        <h3>Stops by radius zone — ${zoneTotal} stops with distance data</h3>
         ${zoneLabels}
-        <div class="zone-summary">
-          Zone rings centered on Marlette, MI · Distances from DQ delivery records · Same-day zones per BCC delivery radius policy
-        </div>
+        <div style="margin-top:10px;font-size:9px;color:#888;border-top:1px solid #eee;padding-top:6px">Zone rings centered on Marlette, MI · Distances from DQ delivery records · Same-day zones per BCC delivery radius policy</div>
       </div>
     </div>
-
     <div class="legend">
-      <div class="leg"><div class="leg-dot" style="background:#d4edda;border:1px solid #b8dec5"></div> Good</div>
-      <div class="leg"><div class="leg-dot" style="background:#fff3cd;border:1px solid #ffc107"></div> Moderate</div>
-      <div class="leg"><div class="leg-dot" style="background:#f8d7da;border:1px solid #f5c6cb"></div> Needs attention</div>
-      <div class="leg" style="margin-left:auto;color:#aaa">Driver thresholds: On Time ≥80% green / ≥60% yellow · Photos ≥90% / ≥70% · Avg Stop ≤20m / ≤35m · Late ≤0 / ≤2</div>
+      <div class="leg"><div class="leg-dot" style="background:#d4edda;border:1px solid #b8dec5"></div>Good</div>
+      <div class="leg"><div class="leg-dot" style="background:#fff3cd;border:1px solid #ffc107"></div>Moderate</div>
+      <div class="leg"><div class="leg-dot" style="background:#f8d7da;border:1px solid #f5c6cb"></div>Needs attention</div>
+      <div class="leg" style="margin-left:auto;color:#aaa">On Time ≥80% / ≥60% · Photos ≥90% / ≥70% · Avg Stop ≤20m / ≤35m · Late ≤0 / ≤2</div>
     </div>
-
     <h2>Driver Performance <span class="hint">ranked best → worst</span></h2>
-    <table>
-      <thead><tr>
-        <th class="left" style="width:24px">#</th>
-        <th class="left">Driver</th>
-        <th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Late &gt;30m</th><th>Avg Late</th>
-      </tr></thead>
-      <tbody>${driverRows}</tbody>
-    </table>
-
+    <table><thead><tr><th class="left" style="width:24px">#</th><th class="left">Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Late &gt;30m</th><th>Avg Late</th></tr></thead>
+    <tbody>${driverRows}</tbody></table>
     <div class="break"></div>
-
     <div class="legend" style="margin-top:6px">
-      <div class="leg"><div class="leg-dot" style="background:#d4edda;border:1px solid #b8dec5"></div> Good</div>
-      <div class="leg"><div class="leg-dot" style="background:#fff3cd;border:1px solid #ffc107"></div> Moderate</div>
-      <div class="leg"><div class="leg-dot" style="background:#f8d7da;border:1px solid #f5c6cb"></div> Needs attention</div>
-      <div class="leg" style="margin-left:auto;color:#aaa">Sales colors are relative — top/mid/bottom third of reps in this date range. Faded rows = no invoice data.</div>
+      <div class="leg"><div class="leg-dot" style="background:#d4edda;border:1px solid #b8dec5"></div>Good</div>
+      <div class="leg"><div class="leg-dot" style="background:#fff3cd;border:1px solid #ffc107"></div>Moderate</div>
+      <div class="leg"><div class="leg-dot" style="background:#f8d7da;border:1px solid #f5c6cb"></div>Needs attention</div>
+      <div class="leg" style="margin-left:auto;color:#aaa">Sales colors are relative — top/mid/bottom third of reps in this date range.</div>
     </div>
-
     <h2>Sales Rep Performance <span class="hint">ranked by total invoice</span></h2>
-    <table>
-      <thead><tr>
-        <th class="left" style="width:24px">#</th>
-        <th class="left">Rep</th>
-        <th>Stops</th><th>Done %</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th>
-      </tr></thead>
-      <tbody>${salesRows}</tbody>
-    </table>
-
-    <div class="foot">
-      <span>Ben's Contractor Center · Confidential</span>
-      <span>BCC Delivery Report &nbsp;·&nbsp; ${start||''} – ${end||''}</span>
-    </div>
+    <table><thead><tr><th class="left" style="width:24px">#</th><th class="left">Rep</th><th>Stops</th><th>Done %</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
+    <tbody>${salesRows}</tbody></table>
+    <div class="foot"><span>Ben's Contractor Center · Confidential</span><span>BCC Delivery Report · ${start||''} – ${end||''}</span></div>
   </body></html>`;
     win.document.open();
     win.document.write(html);
     win.document.close();
+    if (mapDataUrl) {
+      try {
+        const mw = win.document.querySelector('.map-svg-wrap');
+        if (mw) { const img=win.document.createElement('img'); img.src=mapDataUrl; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:4px'; mw.appendChild(img); }
+      } catch(e){}
+    }
   } // end buildPDF
 
-  // Capture the live Leaflet map via html2canvas, fall back gracefully
   if (mapEl && typeof html2canvas !== 'undefined') {
-    html2canvas(mapEl, { useCORS: true, allowTaint: true, scale: 1.5, logging: false })
-      .then(canvas => buildPDF(canvas.toDataURL('image/jpeg', 0.85)))
-      .catch(() => buildPDF(null));
-  } else {
-    buildPDF(null);
-  }
+    html2canvas(mapEl,{useCORS:true,allowTaint:true,scale:1.5,logging:false})
+      .then(canvas=>buildPDF(canvas.toDataURL('image/jpeg',0.85)))
+      .catch(()=>buildPDF(null));
+  } else { buildPDF(null); }
 }
 
 /* ── COLLAPSIBLE ── */
