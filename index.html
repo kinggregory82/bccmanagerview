@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -193,13 +192,19 @@ tbody tr:hover{background:var(--panel2)}
 .report-kpi-val{font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--white)}
 .report-kpi-sub{font-size:12px;color:var(--dim);margin-top:2px}
 .report-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-/* report sections: results table, then full-width multi-metric chart below */
+/* report sections — ranked color-coded tables */
 .report-section{margin-bottom:26px;padding-bottom:22px;border-bottom:1px solid var(--border)}
 .report-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
-.report-results{min-width:0;overflow-x:auto;margin-bottom:14px}
-.report-chart-col{min-width:0}
 .report-sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--off-white);margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--red);display:inline-block}
-.report-chart{position:relative;height:320px;background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:14px 14px 8px}
+.rank-hint{font-size:10px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
+.rank-table{width:100%;border-collapse:collapse}
+.rank-table th{position:sticky;top:0}
+.rank-table td{text-align:center;padding:8px 10px;border-bottom:1px solid var(--border)}
+.rank-table td:nth-child(2){text-align:left}
+.rank-table tbody tr:hover{background:rgba(255,255,255,.03)}
+.rank{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--panel2);border:1px solid var(--border2);font-size:11px;font-weight:700;color:var(--muted)}
+.rank-top{background:linear-gradient(135deg,#2ecc71,#1d9e54);border-color:#2ecc71;color:#fff;box-shadow:0 0 8px rgba(46,204,113,.4)}
+.rank-bot{background:linear-gradient(135deg,#e83030,#9b1818);border-color:#e83030;color:#fff;box-shadow:0 0 8px rgba(232,48,48,.4)}
 .report-range{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
 .report-range label{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
 .report-range input[type=date]{background:var(--panel);border:1px solid var(--border);color:var(--white);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:4px 8px;border-radius:2px}
@@ -396,7 +401,7 @@ tbody tr:hover{background:var(--panel2)}
           <label style="margin-left:8px">To</label>
           <input type="date" id="reportEnd">
           <button class="run-btn" onclick="runReport()">Run Report</button>
-          <button class="run-btn" id="exportPdfBtn" onclick="exportChartsPDF()" style="display:none;margin-left:8px;background:linear-gradient(135deg,#333,#1a1a1a);box-shadow:none">Export Charts PDF</button>
+          <button class="run-btn" id="exportPdfBtn" onclick="exportChartsPDF()" style="display:none;margin-left:8px;background:linear-gradient(135deg,#333,#1a1a1a);box-shadow:none">Export PDF</button>
         </div>
         <div id="reportContent"><div class="empty">Set a date range and click Run Report</div></div>
       </div>
@@ -752,7 +757,7 @@ function render(){
       },
       options:{
         responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},datalabels:{display:false},tooltip:{backgroundColor:'#111',borderColor:'#333',borderWidth:1,titleFont:{family:'IBM Plex Mono',size:9},bodyFont:{family:'IBM Plex Mono',size:10},callbacks:{label:c=>c.dataset.label+': '+(c.raw!==null?c.raw+'%':'—')}}},
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#111',borderColor:'#333',borderWidth:1,titleFont:{family:'IBM Plex Mono',size:9},bodyFont:{family:'IBM Plex Mono',size:10},callbacks:{label:c=>c.dataset.label+': '+(c.raw!==null?c.raw+'%':'—')}}},
         scales:{
           y:{min:0,max:100,grid:{color:'#222'},ticks:{color:'#888',font:{size:11,family:'IBM Plex Mono'},callback:v=>v+'%'}},
           x:{grid:{color:'#222'},ticks:{color:'#888',font:{size:11,family:'IBM Plex Mono'},autoSkip:false,maxRotation:0}},
@@ -806,229 +811,144 @@ function runReport(){
   allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles||0;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
   const salesReport=Object.values(salesMap).sort((a,b)=>(b.invoiceTotal||0)-(a.invoiceTotal||0)||b.t-a.t);
 
+  // Helper: full-cell color background based on thresholds (good ≥g, warn ≥w, else bad)
+  const cellBg=(v,g,w)=>{
+    if(v===null||v===undefined)return'background:transparent;color:var(--dim)';
+    if(v>=g)return'background:rgba(46,204,113,.18);color:#5fe39b;font-weight:700';
+    if(v>=w)return'background:rgba(247,183,49,.18);color:#ffce5c;font-weight:700';
+    return'background:rgba(232,48,48,.20);color:#ff6b6b;font-weight:700';
+  };
+  // Inverted: lower is better (late count, avg late minutes)
+  const cellBgInv=(v,g,w)=>{
+    if(v===null||v===undefined)return'background:transparent;color:var(--dim)';
+    if(v<=g)return'background:rgba(46,204,113,.18);color:#5fe39b;font-weight:700';
+    if(v<=w)return'background:rgba(247,183,49,.18);color:#ffce5c;font-weight:700';
+    return'background:rgba(232,48,48,.20);color:#ff6b6b;font-weight:700';
+  };
+  const rankBadge=(i,total)=>{
+    if(i===0)return'<span class="rank rank-top">1</span>';
+    if(i===total-1&&total>1)return`<span class="rank rank-bot">${i+1}</span>`;
+    return`<span class="rank">${i+1}</span>`;
+  };
+
   cont.innerHTML=`
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
     Period: ${start} → ${end} &nbsp;|&nbsp; ${allStops.length} stops &nbsp;|&nbsp; ${M.complete} delivered &nbsp;|&nbsp; On Time: ${M.ontimePct!==null?M.ontimePct+'%':'—'} &nbsp;|&nbsp; Photos: ${M.photoPct!==null?M.photoPct+'%':'—'}
   </div>
   <div style="padding:14px">
-    <!-- DRIVER PERFORMANCE: results left, chart right -->
+    <!-- DRIVER PERFORMANCE — ranked best→worst, color-coded cells -->
     <div class="report-section">
-      <div class="report-results">
-        <div class="report-sec-title">Driver Performance</div>
-        <table>
-          <thead><tr><th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Avg Late</th></tr></thead>
-          <tbody>
-          ${driversReport.map(d=>{
-            const otp=d.c?Math.round(d.ot/d.c*100):null;
-            const php=d.c?Math.round(d.ph/d.c*100):null;
-            const avgStop=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length)+'m':'—';
-            const avgLate=d.lateMin.length>0?'+'+Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length)+'m':'—';
-            return`<tr>
-              <td><div class="tbl-primary">${d.name}</div></td>
-              <td>${d.c}/${d.t}</td>
-              <td style="color:${pctColor(otp,80,60)};font-weight:600">${otp!==null?otp+'%':'—'}</td>
-              <td style="color:${pctColor(php,90,70)};font-weight:600">${php!==null?php+'%':'—'}</td>
-              <td>${avgStop}</td>
-              <td style="color:${avgLate!=='—'?'var(--red)':'var(--dim)'}">${avgLate}</td>
-            </tr>`;
-          }).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="report-chart-col">
-        <div class="report-sec-title">Driver Comparison — On-Time % vs Photo % (line = stops completed)</div>
-        <div class="report-chart"><canvas id="driverChart"></canvas></div>
-      </div>
+      <div class="report-sec-title">Driver Performance &nbsp;<span class="rank-hint">ranked best → worst</span></div>
+      <table class="rank-table">
+        <thead><tr><th style="width:28px">#</th><th>Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Late (&gt;30m)</th><th>Avg Late</th></tr></thead>
+        <tbody>
+        ${driversReport.map((d,i)=>{
+          const otp=d.c?Math.round(d.ot/d.c*100):null;
+          const php=d.c?Math.round(d.ph/d.c*100):null;
+          const avgStopN=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length):null;
+          const avgLateN=d.lateMin.length>0?Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length):null;
+          const lateCount=d.lateMin.length;
+          return`<tr>
+            <td>${rankBadge(i,driversReport.length)}</td>
+            <td><div class="tbl-primary">${d.name}</div></td>
+            <td style="color:var(--muted)">${d.c}/${d.t}</td>
+            <td style="${cellBg(otp,80,60)}">${otp!==null?otp+'%':'—'}</td>
+            <td style="${cellBg(php,90,70)}">${php!==null?php+'%':'—'}</td>
+            <td style="${cellBgInv(avgStopN,20,35)}">${avgStopN!==null?avgStopN+'m':'—'}</td>
+            <td style="${cellBgInv(lateCount,0,2)}">${lateCount}</td>
+            <td style="${cellBgInv(avgLateN,0,45)}">${avgLateN!==null?'+'+avgLateN+'m':'—'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
     </div>
 
-    <!-- BY SALES REP: results left, chart right -->
+    <!-- BY SALES REP — ranked by revenue, color-coded -->
     <div class="report-section">
-      <div class="report-results">
-        <div class="report-sec-title">By Sales Rep</div>
-        <table>
-          <thead><tr><th>Rep</th><th>Total</th><th>Done</th><th>%</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
-          <tbody>
-          ${salesReport.map(s=>{
-            const cp=s.t?Math.round(s.c/s.t*100):0;
-            const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
-            const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
-            const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
-            const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
-            return`<tr>
-              <td style="font-weight:600;color:var(--white)">${s.rep}</td>
-              <td>${s.t}</td><td>${s.c}</td>
-              <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
-              <td style="color:var(--muted)">${milesStr}</td>
-              <td style="color:var(--green);font-weight:600">${fmtM(s.invoiceTotal)}</td>
-              <td style="color:var(--muted)">${fmtM(avgInv)}</td>
-              <td style="color:var(--amber);font-weight:600">${invPerMile}</td>
-            </tr>`;
-          }).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="report-chart-col">
-        <div class="report-sec-title">Sales Rep — Total Invoice $ (bars) vs $/Mile efficiency (line)</div>
-        <div class="report-chart"><canvas id="salesChart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- ISSUES: late + missing photos per driver -->
-    <div class="report-section">
-      <div class="report-chart-col">
-        <div class="report-sec-title">Problem Spotting — Late Deliveries &amp; Missing Photos by Driver</div>
-        <div class="report-chart"><canvas id="issuesChart"></canvas></div>
-      </div>
+      <div class="report-sec-title">Sales Rep Performance &nbsp;<span class="rank-hint">ranked by total invoice</span></div>
+      <table class="rank-table">
+        <thead><tr><th style="width:28px">#</th><th>Rep</th><th>Stops</th><th>Done %</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
+        <tbody>
+        ${salesReport.map((s,i)=>{
+          const cp=s.t?Math.round(s.c/s.t*100):0;
+          const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
+          const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+          const perMileN=s.miles>0&&s.invoiceTotal>0?Math.round(s.invoiceTotal/s.miles):null;
+          const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
+          return`<tr>
+            <td>${rankBadge(i,salesReport.length)}</td>
+            <td style="font-weight:600;color:var(--white)">${s.rep}</td>
+            <td style="color:var(--muted)">${s.c}/${s.t}</td>
+            <td style="${cellBg(cp,80,60)}">${cp}%</td>
+            <td style="color:var(--muted)">${milesStr}</td>
+            <td style="color:#5fe39b;font-weight:700">${fmtM(s.invoiceTotal)}</td>
+            <td style="color:var(--muted)">${fmtM(avgInv)}</td>
+            <td style="${cellBg(perMileN,150,75)}">${perMileN!==null?'$'+perMileN:'—'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 
-  // Render the charts and stash data for PDF export
-  renderReportCharts(driversReport, salesReport, start, end, M, allStops.length);
+  // Stash report data for the PDF export
+  _reportData = { driversReport, salesReport, start, end, M, totalStops: allStops.length };
   document.getElementById('exportPdfBtn').style.display = 'inline-block';
 }
 
-// Holds the live Chart.js instances + meta for PDF export
-let _reportCharts = { driver: null, sales: null, issues: null, meta: null };
+// Holds the last report's computed data for the PDF export
+let _reportData = null;
 
-function renderReportCharts(driversReport, salesReport, start, end, M, totalStops) {
-  // Destroy any prior charts to avoid canvas reuse errors
-  ['driver','sales','issues'].forEach(k => {
-    if (_reportCharts[k]) { _reportCharts[k].destroy(); _reportCharts[k] = null; }
-  });
-
-  const grid   = 'rgba(255,255,255,0.07)';
-  const tick   = '#cfcfcf';
-  const RED='#e83030', GREEN='#2ecc71', AMBER='#f7b731', BLUE='#3d9be8', WHITE='#ffffff';
-  const labelFont = { family: "'IBM Plex Sans', sans-serif", weight: '700', size: 11 };
-
-  // Shared base options (datalabels plugin is registered globally via CDN)
-  const base = (extra={}) => ({
-    responsive: true, maintainAspectRatio: false,
-    layout: { padding: { top: 22, right: 8, left: 4, bottom: 4 } },
-    plugins: {
-      legend: { display: true, position: 'top', labels: { color: tick, font: { size: 11 }, boxWidth: 12, padding: 12 } },
-      tooltip: { enabled: true, titleFont: { size: 12 }, bodyFont: { size: 12 } },
-      datalabels: { display: false },
-      ...(extra.plugins||{}),
-    },
-    animation: { duration: 350 },
-    ...extra.root,
-  });
-
-  const firstName = full => (full||'').split(' ')[0] || full || '—';
-
-  // ─────────────────────────────────────────────────────────────
-  // 1) DRIVER COMPARISON — On-Time % + Photo % grouped bars,
-  //    stops-completed as a line on a second axis. Labels on bars.
-  // ─────────────────────────────────────────────────────────────
-  const dCtx = document.getElementById('driverChart');
-  if (dCtx) {
-    const labels  = driversReport.map(d => firstName(d.name));
-    const ontime  = driversReport.map(d => d.c ? Math.round(d.ot/d.c*100) : 0);
-    const photos  = driversReport.map(d => d.c ? Math.round(d.ph/d.c*100) : 0);
-    const stops   = driversReport.map(d => d.c);
-    _reportCharts.driver = new Chart(dCtx, {
-      data: {
-        labels,
-        datasets: [
-          { type:'bar', label:'On-Time %', data:ontime, backgroundColor:RED, borderRadius:3, maxBarThickness:34, yAxisID:'pct',
-            datalabels:{ display:true, anchor:'end', align:'end', color:WHITE, font:labelFont, formatter:v=>v+'%' } },
-          { type:'bar', label:'Photo %', data:photos, backgroundColor:BLUE, borderRadius:3, maxBarThickness:34, yAxisID:'pct',
-            datalabels:{ display:true, anchor:'end', align:'end', color:WHITE, font:labelFont, formatter:v=>v+'%' } },
-          { type:'line', label:'Stops Done', data:stops, borderColor:AMBER, backgroundColor:AMBER, borderWidth:2,
-            pointRadius:4, pointBackgroundColor:AMBER, tension:0.25, yAxisID:'count',
-            datalabels:{ display:true, align:'top', color:AMBER, font:labelFont, formatter:v=>v } },
-        ],
-      },
-      options: base({
-        plugins:{ datalabels:{ clamp:true } },
-        root:{ scales:{
-          x:{ ticks:{ color:tick, font:{size:11} }, grid:{ color:grid } },
-          pct:{ position:'left', beginAtZero:true, max:105, ticks:{ color:tick, callback:v=>v+'%', stepSize:25 }, grid:{ color:grid }, title:{ display:true, text:'% (on-time / photos)', color:tick, font:{size:10} } },
-          count:{ position:'right', beginAtZero:true, ticks:{ color:AMBER, precision:0 }, grid:{ drawOnChartArea:false }, title:{ display:true, text:'stops done', color:AMBER, font:{size:10} } },
-        }},
-      }),
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // 2) SALES REP — Total Invoice $ bars + $/Mile efficiency line.
-  // ─────────────────────────────────────────────────────────────
-  const sCtx = document.getElementById('salesChart');
-  if (sCtx) {
-    const labels   = salesReport.map(s => s.rep);
-    const invoice  = salesReport.map(s => Math.round(s.invoiceTotal||0));
-    const perMile  = salesReport.map(s => (s.miles>0 && s.invoiceTotal>0) ? Math.round(s.invoiceTotal/s.miles) : 0);
-    const fmtK = v => v>=1000 ? '$'+(v/1000).toFixed(v>=10000?0:1)+'k' : '$'+v;
-    _reportCharts.sales = new Chart(sCtx, {
-      data: {
-        labels,
-        datasets: [
-          { type:'bar', label:'Total Invoice $', data:invoice, backgroundColor:GREEN, borderRadius:3, maxBarThickness:46, yAxisID:'dollars',
-            datalabels:{ display:true, anchor:'end', align:'end', color:WHITE, font:labelFont, formatter:fmtK } },
-          { type:'line', label:'$ / Mile', data:perMile, borderColor:AMBER, backgroundColor:AMBER, borderWidth:2,
-            pointRadius:4, pointBackgroundColor:AMBER, tension:0.25, yAxisID:'permile',
-            datalabels:{ display:true, align:'top', color:AMBER, font:labelFont, formatter:v=>'$'+v } },
-        ],
-      },
-      options: base({
-        root:{ scales:{
-          x:{ ticks:{ color:tick, font:{size:11} }, grid:{ color:grid } },
-          dollars:{ position:'left', beginAtZero:true, ticks:{ color:tick, callback:fmtK }, grid:{ color:grid }, title:{ display:true, text:'total invoice $', color:tick, font:{size:10} } },
-          permile:{ position:'right', beginAtZero:true, ticks:{ color:AMBER, callback:v=>'$'+v }, grid:{ drawOnChartArea:false }, title:{ display:true, text:'$ per mile', color:AMBER, font:{size:10} } },
-        }},
-      }),
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // 3) PROBLEM SPOTTING — Late deliveries + Missing photos per driver
-  //    (counts, stacked-friendly grouped bars, labeled).
-  // ─────────────────────────────────────────────────────────────
-  const iCtx = document.getElementById('issuesChart');
-  if (iCtx) {
-    const labels  = driversReport.map(d => firstName(d.name));
-    const late    = driversReport.map(d => d.lateMin.length);              // # stops >30m late
-    const noPhoto = driversReport.map(d => Math.max(0, d.c - d.ph));       // completed without photo
-    _reportCharts.issues = new Chart(iCtx, {
-      type:'bar',
-      data: {
-        labels,
-        datasets: [
-          { label:'Late (>30m)', data:late, backgroundColor:RED, borderRadius:3, maxBarThickness:34,
-            datalabels:{ display:true, anchor:'end', align:'end', color:WHITE, font:labelFont, formatter:v=>v||'' } },
-          { label:'Missing Photo', data:noPhoto, backgroundColor:AMBER, borderRadius:3, maxBarThickness:34,
-            datalabels:{ display:true, anchor:'end', align:'end', color:'#1a1a1a', font:labelFont, formatter:v=>v||'' } },
-        ],
-      },
-      options: base({
-        root:{ scales:{
-          x:{ ticks:{ color:tick, font:{size:11} }, grid:{ color:grid } },
-          y:{ beginAtZero:true, ticks:{ color:tick, precision:0 }, grid:{ color:grid }, title:{ display:true, text:'# of stops', color:tick, font:{size:10} } },
-        }},
-      }),
-    });
-  }
-
-  _reportCharts.meta = { start, end, totalStops, complete: M.complete, ontimePct: M.ontimePct, photoPct: M.photoPct };
-}
-
-// Export a LANDSCAPE PDF with all three charts, large and legible with on-bar numbers.
+// Export a clean LANDSCAPE PDF of the ranked, color-coded tables.
 function exportChartsPDF() {
-  if (!_reportCharts.driver) { alert('Run a report first.'); return; }
-  const m = _reportCharts.meta || {};
-  const driverImg = _reportCharts.driver ? _reportCharts.driver.toBase64Image('image/png', 1) : '';
-  const salesImg  = _reportCharts.sales  ? _reportCharts.sales.toBase64Image('image/png', 1)  : '';
-  const issuesImg = _reportCharts.issues ? _reportCharts.issues.toBase64Image('image/png', 1) : '';
+  if (!_reportData) { alert('Run a report first.'); return; }
+  const { driversReport, salesReport, start, end, M, totalStops } = _reportData;
+
+  // Same threshold coloring as the on-screen tables, but print-friendly fills.
+  const bg=(v,g,w)=>{ if(v===null||v===undefined)return'';
+    if(v>=g)return'background:#d7f5e3'; if(v>=w)return'background:#fdeecb'; return'background:#fbdada'; };
+  const bgInv=(v,g,w)=>{ if(v===null||v===undefined)return'';
+    if(v<=g)return'background:#d7f5e3'; if(v<=w)return'background:#fdeecb'; return'background:#fbdada'; };
+
+  const driverRows = driversReport.map((d,i)=>{
+    const otp=d.c?Math.round(d.ot/d.c*100):null;
+    const php=d.c?Math.round(d.ph/d.c*100):null;
+    const avgStopN=d.stopMins.length>0?Math.round(d.stopMins.reduce((a,b)=>a+b,0)/d.stopMins.length):null;
+    const avgLateN=d.lateMin.length>0?Math.round(d.lateMin.reduce((a,b)=>a+b,0)/d.lateMin.length):null;
+    const lateCount=d.lateMin.length;
+    return `<tr>
+      <td class="rk">${i+1}</td>
+      <td class="nm">${d.name}</td>
+      <td>${d.c}/${d.t}</td>
+      <td style="${bg(otp,80,60)}">${otp!==null?otp+'%':'—'}</td>
+      <td style="${bg(php,90,70)}">${php!==null?php+'%':'—'}</td>
+      <td style="${bgInv(avgStopN,20,35)}">${avgStopN!==null?avgStopN+'m':'—'}</td>
+      <td style="${bgInv(lateCount,0,2)}">${lateCount}</td>
+      <td style="${bgInv(avgLateN,0,45)}">${avgLateN!==null?'+'+avgLateN+'m':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const salesRows = salesReport.map((s,i)=>{
+    const cp=s.t?Math.round(s.c/s.t*100):0;
+    const fmtM=v=>v>0?'$'+Math.round(v).toLocaleString('en-US'):'—';
+    const avgInv=s.invoiceCount>0?s.invoiceTotal/s.invoiceCount:0;
+    const perMileN=s.miles>0&&s.invoiceTotal>0?Math.round(s.invoiceTotal/s.miles):null;
+    const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
+    return `<tr>
+      <td class="rk">${i+1}</td>
+      <td class="nm">${s.rep}</td>
+      <td>${s.c}/${s.t}</td>
+      <td style="${bg(cp,80,60)}">${cp}%</td>
+      <td>${milesStr}</td>
+      <td style="background:#d7f5e3;font-weight:700">${fmtM(s.invoiceTotal)}</td>
+      <td>${fmtM(avgInv)}</td>
+      <td style="${bg(perMileN,150,75)}">${perMileN!==null?'$'+perMileN:'—'}</td>
+    </tr>`;
+  }).join('');
 
   const win = window.open('', '_blank');
   if (!win) { alert('Allow pop-ups to export the PDF.'); return; }
-  const block = (title, img) => img ? `
-    <div class="chart-block">
-      <h2>${title}</h2>
-      <img src="${img}">
-    </div>` : '';
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Report ${m.start||''} to ${m.end||''}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>BCC Report ${start||''} to ${end||''}</title>
   <style>
     @page { size: landscape; margin: 12mm; }
     * { box-sizing: border-box; }
@@ -1036,29 +956,40 @@ function exportChartsPDF() {
     .hdr { border-bottom:3px solid #C41230; padding-bottom:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:flex-end; }
     .hdr h1 { font-size:22px; letter-spacing:1px; color:#C41230; margin:0; text-transform:uppercase; }
     .hdr .period { font-size:13px; color:#444; }
-    .kpis { display:flex; gap:34px; margin-bottom:16px; }
+    .kpis { display:flex; gap:34px; margin-bottom:18px; }
     .kpi { font-size:12px; color:#555; text-transform:uppercase; letter-spacing:.5px; }
     .kpi b { display:block; font-size:26px; color:#111; letter-spacing:0; }
-    .chart-block { margin-bottom:18px; page-break-inside:avoid; }
-    .chart-block h2 { font-size:14px; color:#222; margin:0 0 6px; border-left:4px solid #C41230; padding-left:8px; text-transform:uppercase; letter-spacing:.5px; }
-    .chart-block img { width:100%; max-height:430px; object-fit:contain; border:1px solid #ddd; padding:6px; background:#fff; }
-    .foot { margin-top:10px; font-size:10px; color:#999; text-align:right; }
-    @media print { .chart-block { page-break-inside:avoid; } }
+    h2 { font-size:14px; color:#222; margin:18px 0 8px; border-left:4px solid #C41230; padding-left:8px; text-transform:uppercase; letter-spacing:.5px; }
+    h2 .hint { font-size:10px; color:#999; font-weight:normal; text-transform:none; letter-spacing:0; }
+    table { width:100%; border-collapse:collapse; font-size:12px; page-break-inside:avoid; }
+    th { background:#222; color:#fff; text-align:left; padding:7px 9px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
+    td { padding:7px 9px; border-bottom:1px solid #e3e3e3; text-align:center; }
+    td.rk { width:30px; color:#999; font-weight:700; text-align:center; }
+    td.nm { text-align:left; font-weight:700; }
+    tr:first-child td.rk { color:#C41230; }
+    .foot { margin-top:14px; font-size:10px; color:#999; text-align:right; }
   </style></head>
   <body onload="setTimeout(function(){window.print();},250)">
     <div class="hdr">
       <h1>BCC Delivery Report</h1>
-      <div class="period">${m.start||''} &nbsp;→&nbsp; ${m.end||''}</div>
+      <div class="period">${start||''} &nbsp;→&nbsp; ${end||''}</div>
     </div>
     <div class="kpis">
-      <div class="kpi"><b>${m.totalStops||0}</b>Total Stops</div>
-      <div class="kpi"><b>${m.complete||0}</b>Delivered</div>
-      <div class="kpi"><b>${m.ontimePct!=null?m.ontimePct+'%':'—'}</b>On Time</div>
-      <div class="kpi"><b>${m.photoPct!=null?m.photoPct+'%':'—'}</b>Photos</div>
+      <div class="kpi"><b>${totalStops||0}</b>Total Stops</div>
+      <div class="kpi"><b>${M.complete||0}</b>Delivered</div>
+      <div class="kpi"><b>${M.ontimePct!=null?M.ontimePct+'%':'—'}</b>On Time</div>
+      <div class="kpi"><b>${M.photoPct!=null?M.photoPct+'%':'—'}</b>Photos</div>
     </div>
-    ${block('Driver Comparison — On-Time % vs Photo % (line = stops done)', driverImg)}
-    ${block('Sales Rep — Total Invoice $ vs $/Mile efficiency', salesImg)}
-    ${block('Problem Spotting — Late Deliveries &amp; Missing Photos by Driver', issuesImg)}
+    <h2>Driver Performance <span class="hint">— ranked best to worst</span></h2>
+    <table>
+      <thead><tr><th>#</th><th style="text-align:left">Driver</th><th>Stops</th><th>On Time</th><th>Photos</th><th>Avg Stop</th><th>Late &gt;30m</th><th>Avg Late</th></tr></thead>
+      <tbody>${driverRows}</tbody>
+    </table>
+    <h2>Sales Rep Performance <span class="hint">— ranked by total invoice</span></h2>
+    <table>
+      <thead><tr><th>#</th><th style="text-align:left">Rep</th><th>Stops</th><th>Done %</th><th>Miles</th><th>Total Invoice</th><th>Avg Invoice</th><th>$/Mile</th></tr></thead>
+      <tbody>${salesRows}</tbody>
+    </table>
     <div class="foot">Generated ${new Date().toLocaleString()} · Ben's Contractor Center</div>
   </body></html>`;
   win.document.open();
