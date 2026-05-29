@@ -514,14 +514,14 @@ function getStops(route,routeId){
 function isComplete(s){return(s.status||'').toLowerCase()==='complete'||(s.deliveryStatus||'').toLowerCase()==='delivered'||!!s.completedAt}
 function hasPhoto(s){if(!s.pictures)return false;if(Array.isArray(s.pictures))return s.pictures.filter(Boolean).length>0;return Object.values(s.pictures).filter(Boolean).length>0}
 function hasSms(s){return!!(s.smsSent&&(s.smsSent.departed||s.smsSent.advance))}
-function minutesLate(s){try{const arr=s.arrivalTime||s.completedAt,eta=s.seedEta||s.calculatedEta;if(!arr||!eta)return null;return Math.round((new Date(arr)-new Date(eta))/60000);}catch(e){return null}}
+function minutesLate(s){try{const arr=s.arrivalTime||s.completedAt,eta=s.timingAnchor||s.calculatedEta||s.seedEta;if(!arr||!eta)return null;return Math.round((new Date(arr)-new Date(eta))/60000);}catch(e){return null}}
 function stopMinutes(s){try{const arr=s.arrivalTime,dep=s.deliveryTime||s.completedAt;if(!arr||!dep)return null;const m=Math.round((new Date(dep)-new Date(arr))/60000);return m>0?m:null;}catch(e){return null}}
 
 function metrics(stops){
   const comp=stops.filter(isComplete),pend=stops.filter(s=>!isComplete(s));
   const ph=comp.filter(hasPhoto),sms=stops.filter(hasSms);
   // Only include stops that actually have timing data (field set or arrival+eta available)
-  const hasTimingData=s=>s.timing||((s.arrivalTime||s.completedAt)&&(s.seedEta||s.calculatedEta));
+  const hasTimingData=s=>s.timing||((s.arrivalTime||s.completedAt)&&(s.timingAnchor||s.calculatedEta||s.seedEta));
   const compWithTiming=comp.filter(hasTimingData);
   const late=compWithTiming.filter(s=>{if(s.timing==='late')return true;if(s.timing==='early'||s.timing==='ontime')return false;const ml=minutesLate(s);return ml!==null&&ml>30;});
   const ontime=compWithTiming.filter(s=>{if(s.timing==='early'||s.timing==='ontime')return true;if(s.timing==='late')return false;const ml=minutesLate(s);return ml!==null&&ml<=30;});
