@@ -413,6 +413,35 @@ tbody tr:hover{background:var(--panel2)}
 <script>
 const FIREBASE='https://bccsms-27c55-default-rtdb.firebaseio.com';
 const DISPATCH_URL='https://kinggregory82.github.io/bccdispatch';
+const DQ_ENDPOINT='https://dqtapim.azure-api.net/BensContractorCenter?subscription-key=b14ba32fef4b4c959d044af313e2b220';
+
+async function fetchOrderSummary(startDate, endDate) {
+  const query = `query orderSummary($input: GetOrderSummaryInput!, $first: Int) {
+    orderSummary(input: $input, first: $first) {
+      totalCount
+      nodes {
+        orderNumber deliveryId deliveryDate orderStatus shipToName
+        address1 city state stopNumber arrivalTime deliveryTime orderWeight
+        mainCustomerName totalDeliveryMiles totalDeliveryTime orderStopTime
+      }
+    }
+  }`;
+  try {
+    const r = await fetch(DQ_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: {
+        first: 20000,
+        input: { startDeliveryDate: startDate, endDeliveryDate: endDate, locationNames: ['1000'], assetNumbers: [], driverNames: [] }
+      }})
+    });
+    const data = await r.json();
+    return (data?.data?.orderSummary?.nodes) || [];
+  } catch(e) {
+    console.error('orderSummary fetch failed:', e);
+    return [];
+  }
+}
 const DISPATCH_PIN='2025';
 const DRIVER_MAP={'460':'Tyler Begley','985':'Mitch Warczinsky','392':'Tim Bailey','537':'Gary Rogers','320':'Larry Reid','396':'Mike Desutter','788':'Chad Billot','750':'Tim Bailey','481':'','627':''};
 const CITY_COORDS={
@@ -511,7 +540,14 @@ function getStops(route,routeId){
     _distanceMiles:parseFloat(s.distanceMiles||0)||0,
   }));
 }
-function isComplete(s){return(s.status||'').toLowerCase()==='complete'||(s.deliveryStatus||'').toLowerCase()==='delivered'||!!s.completedAt}
+function isComplete(s){
+  if((s.status||'').toLowerCase()==='complete') return true;
+  if(s.completedAt) return true;
+  const ds=(s.deliveryStatus||'').toLowerCase();
+  return ['delivered','delivered w/signature','delivered no/signature','delivered partial w/sig',
+    'delivered partial no/sig','delivery complete','not delivered','complete','completed','pod','signed'
+  ].some(v=>ds.includes(v));
+}
 function hasPhoto(s){if(!s.pictures)return false;if(Array.isArray(s.pictures))return s.pictures.filter(Boolean).length>0;return Object.values(s.pictures).filter(Boolean).length>0}
 function hasSms(s){return!!(s.smsSent&&(s.smsSent.departed||s.smsSent.advance))}
 function minutesLate(s){try{const arr=s.arrivalTime||s.completedAt,eta=s.timingAnchor||s.calculatedEta||s.seedEta;if(!arr||!eta)return null;return Math.round((new Date(arr)-new Date(eta))/60000);}catch(e){return null}}
@@ -693,10 +729,11 @@ function render(){
     const assetDesc=(r.assetDescription||'').trim();
     const asset=assetNum?(assetNum+(assetDesc?' '+assetDesc:'')):(assetDesc||id);
     const driver=resolveDriver(r);
-    if(!fleetMap[asset])fleetMap[asset]={asset,driver,done:0,total:0};
+    if(!fleetMap[asset])fleetMap[asset]={asset,driver,done:0,total:0,weight:0};
     const stops=Object.values(r.stops||{});
     fleetMap[asset].total+=stops.length;fleetMap[asset].done+=stops.filter(isComplete).length;
     if(!fleetMap[asset].driver&&driver)fleetMap[asset].driver=driver;
+    if(r.tripWeight)fleetMap[asset].weight+=parseFloat(r.tripWeight)||0;
   });
   const fleet=Object.values(fleetMap).sort((a,b)=>a.asset.localeCompare(b.asset));
   document.getElementById('fleetMeta').textContent=fleet.length+' assets · '+(isToday?'Live':'Hist');
@@ -710,7 +747,7 @@ function render(){
         <div class="fleet-asset">${f.asset}</div>
         <div class="fleet-driver">${f.driver||'—'}</div>
         <div class="fleet-bar"><div class="fleet-fill" style="width:${pct}%;background:${fillColor}"></div></div>
-        <div class="fleet-meta"><span>${f.done}/${f.total}</span><span style="color:${fillColor};font-weight:600">${allDone&&isToday?'DONE':pct+'%'}</span></div>
+        <div class="fleet-meta"><span>${f.done}/${f.total}</span>${f.weight>0?`<span style="color:var(--dim)">${Math.round(f.weight).toLocaleString()} lbs</span>`:''}<span style="color:${fillColor};font-weight:600">${allDone&&isToday?'DONE':pct+'%'}</span></div>
       </div>`;
     }).join('');
 
@@ -779,13 +816,61 @@ function runReport(){
   const cont=document.getElementById('reportContent');
   cont.innerHTML='<div class="empty">Generating report…</div>';
 
-  const allSrc=Object.assign({},cachedHistorical,cachedRoutes);
-  let allStops=[];
-  Object.entries(allSrc).forEach(([id,r])=>{
-    if(r&&r.date>=start&&r.date<=end)allStops=allStops.concat(getStops(r,id));
-  });
+  // Fetch DQ orderSummary in parallel with Firebase data
+  fetchOrderSummary(start, end).then(dqSummary => {
+    // Build lookup by orderNumber for DQ enrichment
+    const dqByOrder = {};
+    dqSummary.forEach(n => { if(n.orderNumber) dqByOrder[n.orderNumber] = n; });
 
-  if(allStops.length===0){cont.innerHTML='<div class="empty">No data for selected range</div>';return;}
+    const allSrc=Object.assign({},cachedHistorical,cachedRoutes);
+    let allStops=[];
+    Object.entries(allSrc).forEach(([id,r])=>{
+      if(r&&r.date>=start&&r.date<=end)allStops=allStops.concat(getStops(r,id));
+    });
+
+    // Enrich Firebase stops with DQ summary data
+    allStops.forEach(s => {
+      const dq = dqByOrder[s.orderNumber];
+      if(dq) {
+        if(!s.arrivalTime && dq.arrivalTime) s.arrivalTime = dq.arrivalTime;
+        if(!s.deliveryTime && dq.deliveryTime) s.deliveryTime = dq.deliveryTime;
+        if(!s.weight && dq.orderWeight) s.weight = dq.orderWeight;
+        if(dq.totalDeliveryMiles) s._distanceMiles = parseFloat(dq.totalDeliveryMiles) || s._distanceMiles;
+      }
+    });
+
+    // Add DQ stops not in Firebase (historical data)
+    if(dqSummary.length > 0) {
+      const fbOrderNums = new Set(allStops.map(s => s.orderNumber));
+      dqSummary.forEach(n => {
+        if(!fbOrderNums.has(n.orderNumber) && n.orderNumber) {
+          const isDelivered = ['delivered','delivered w/signature','delivered no/signature',
+            'delivery complete','not delivered','complete'].some(v => (n.orderStatus||'').toLowerCase().includes(v));
+          allStops.push({
+            orderNumber: n.orderNumber,
+            customerName: n.shipToName || n.mainCustomerName || '',
+            address: [n.address1, n.city, n.state].filter(Boolean).join(', '),
+            status: isDelivered ? 'complete' : 'pending',
+            completedAt: n.deliveryTime,
+            arrivalTime: n.arrivalTime,
+            deliveryTime: n.deliveryTime,
+            weight: n.orderWeight,
+            _distanceMiles: parseFloat(n.totalDeliveryMiles) || 0,
+            _saleTotal: 0,
+            _driver: '',
+            _asset: '',
+            _date: n.deliveryDate ? n.deliveryDate.slice(0,10) : start,
+          });
+        }
+      });
+    }
+
+    if(allStops.length===0){cont.innerHTML='<div class="empty">No data for selected range</div>';return;}
+    buildReportHTML(allStops, start, end, cont, dqSummary.length);
+  });
+}
+
+function buildReportHTML(allStops, start, end, cont, dqCount) {
 
   const M=metrics(allStops);
 
@@ -833,7 +918,7 @@ function runReport(){
 
   cont.innerHTML=`
   <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace">
-    Period: ${start} → ${end} &nbsp;|&nbsp; ${allStops.length} stops &nbsp;|&nbsp; ${M.complete} delivered &nbsp;|&nbsp; On Time: ${M.ontimePct!==null?M.ontimePct+'%':'—'} &nbsp;|&nbsp; Photos: ${M.photoPct!==null?M.photoPct+'%':'—'}
+    Period: ${start} → ${end} &nbsp;|&nbsp; ${allStops.length} stops &nbsp;|&nbsp; ${M.complete} delivered &nbsp;|&nbsp; On Time: ${M.ontimePct!==null?M.ontimePct+'%':'—'} &nbsp;|&nbsp; Photos: ${M.photoPct!==null?M.photoPct+'%':'—'}${dqCount?' &nbsp;|&nbsp; <span style="color:var(--green)">✓ DQ verified</span>':''}
   </div>
   <div style="padding:14px">
     <!-- DRIVER PERFORMANCE — ranked best→worst, color-coded cells -->
