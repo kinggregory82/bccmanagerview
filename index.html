@@ -573,7 +573,20 @@ async function loadData(){
   try{
     document.getElementById('syncTime').textContent='Syncing…';
     const[routes,hist,mil]=await Promise.all([fetchJSON('/routes'),fetchJSON('/historical'),fetchJSON('/mileage')]);
-    cachedRoutes=routes||{};cachedHistorical=hist||{};cachedMileage=mil||{};
+    if(Array.isArray(routes)){
+      cachedRoutes={};
+      routes.forEach((r,i)=>{ if(r) cachedRoutes[String(i)]=r; });
+    } else {
+      cachedRoutes=routes||{};
+    }
+    // /historical is a sparse array from Firebase — index IS the route ID
+    if(Array.isArray(hist)){
+      cachedHistorical={};
+      hist.forEach((r,i)=>{ if(r) cachedHistorical[String(i)]=r; });
+    } else {
+      cachedHistorical=hist||{};
+    }
+    cachedMileage=mil||{};
     render();
     document.getElementById('syncTime').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   }catch(e){
