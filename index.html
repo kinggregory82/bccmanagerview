@@ -443,7 +443,7 @@ async function fetchOrderSummary(startDate, endDate) {
   }
 }
 const DISPATCH_PIN='2025';
-const DRIVER_MAP={'460':'Tyler Begley','985':'Mitch Warczinsky','392':'Tim Bailey','537':'Gary Rogers','320':'Larry Reid','396':'Mike Desutter','788':'Chad Billot','750':'Tim Bailey','481':'','627':''};
+// Driver names come from DQ via route.driverName
 const CITY_COORDS={
   'marlette':[43.1392,-83.0836],'sandusky':[43.4206,-82.8330],'bad axe':[43.8025,-83.0000],
   'caro':[43.4878,-83.3963],'vassar':[43.3722,-83.5833],'cass city':[43.5978,-83.1747],
@@ -489,10 +489,7 @@ function shortDate(ds){return new Date(ds+'T12:00:00').toLocaleDateString('en-US
 function pctColor(v,g,w){if(v===null||v===undefined)return'var(--muted)';return v>=g?'var(--green)':v>=w?'var(--amber)':'var(--red)'}
 
 function resolveDriver(route){
-  const n=(route.driverName||'').trim();if(n)return n;
-  const a=(route.asset||'').trim();
-  for(const[num,drv]of Object.entries(DRIVER_MAP)){if(a===num||a.startsWith(num+' '))return drv;}
-  return '';
+  return (route.driverName||'').trim();
 }
 function cityFromAddress(addr){
   if(!addr)return null;
