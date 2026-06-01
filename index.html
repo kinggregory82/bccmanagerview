@@ -445,7 +445,7 @@ async function fetchOrderSummary(startDate, endDate) {
 const DISPATCH_PIN='2025';
 // Driver names come from DQ via route.driverName
 const CITY_COORDS={
-  'marlette':[43.1392,-83.0836],'sandusky':[43.4206,-82.8330],'bad axe':[43.8025,-83.0000],
+  'marlette':[43.3447,-83.0857],'sandusky':[43.4206,-82.8330],'bad axe':[43.8025,-83.0000],
   'caro':[43.4878,-83.3963],'vassar':[43.3722,-83.5833],'cass city':[43.5978,-83.1747],
   'pigeon':[43.8289,-83.2691],'harbor beach':[43.8428,-82.6513],'ubly':[43.7128,-82.9327],
   'deckerville':[43.5231,-82.7297],'lexington':[43.2678,-82.5342],'port sanilac':[43.4303,-82.5431],
@@ -597,7 +597,7 @@ function initMap(){
   if(leafletMap)return;
   leafletMap=L.map('deliveryMap',{zoomControl:true,attributionControl:false}).setView([43.2,-83.5],7);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(leafletMap);
-  L.circleMarker([43.1392,-83.0836],{radius:7,fillColor:'#fff',fillOpacity:1,color:'#555',weight:1.5})
+  L.circleMarker([43.3447,-83.0857],{radius:7,fillColor:'#fff',fillOpacity:1,color:'#555',weight:1.5})
     .addTo(leafletMap).bindPopup('<b style="font-family:monospace">BCC Yard — Marlette, MI</b>');
 }
 function updateMap(stops){
