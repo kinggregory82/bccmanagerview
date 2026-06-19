@@ -1118,7 +1118,7 @@ function initFleetMap(){
   if(fleetMapL)return;
   fleetMapL=L.map('fleetMap',{zoomControl:true,attributionControl:false}).setView(YARD_LL,7);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(fleetMapL);
-  const yardIcon=L.divIcon({className:'',html:'<div style="font-family:'Oswald',sans-serif;font-size:10px;font-weight:700;color:#C41230;text-shadow:0 0 3px #000,1px 1px 0 #000,-1px -1px 0 #000;white-space:nowrap">● YARD</div>',iconAnchor:[20,8]});
+  const yardIcon=L.divIcon({className:'',html:'<div style="font-family:Oswald,sans-serif;font-size:10px;font-weight:700;color:#C41230;text-shadow:0 0 3px #000,1px 1px 0 #000,-1px -1px 0 #000;white-space:nowrap">● YARD</div>',iconAnchor:[20,8]});
   L.marker(YARD_LL,{icon:yardIcon,interactive:false}).addTo(fleetMapL);
 }
 
