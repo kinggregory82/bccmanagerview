@@ -683,7 +683,7 @@ function render(){
     :Object.entries(lateByDriver).map(([drv,stops])=>
         stops.slice(0,5).map(s=>`<div class="issue-row">
           <div><div class="order-num">${s.orderNumber||'—'}</div>
-            <div style="font-size:12px;font-weight:600;color:var(--white)">${(s.customerName||s.shipToName||'—').substring(0,26)}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text)">${(s.customerName||s.shipToName||'—').substring(0,26)}</div>
             <div style="font-size:10px;color:var(--muted)">${drv}</div>
           </div>
           <span class="badge b-late">${s._ml!==null?'+'+s._ml+'m':'LATE'}</span>
@@ -695,7 +695,7 @@ function render(){
     ?'<div class="empty">None</div>'
     :M.noPhotoComp.slice(0,6).map(s=>`<div class="issue-row">
         <div><div class="order-num">${s.orderNumber||'—'}</div>
-          <div style="font-size:12px;font-weight:600;color:var(--white)">${(s.customerName||s.shipToName||'—').substring(0,26)}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)">${(s.customerName||s.shipToName||'—').substring(0,26)}</div>
           <div style="font-size:10px;color:var(--muted)">${s._driver||'—'}</div>
         </div>
         <span class="badge b-nophoto">NO PHOTO</span>
@@ -776,7 +776,7 @@ function render(){
       const invPerMile=s.miles>0&&s.invoiceTotal>0?'$'+Math.round(s.invoiceTotal/s.miles):'—';
       const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
       return`<tr>
-        <td style="font-weight:600;color:var(--white)">${s.rep}</td>
+        <td style="font-weight:600;color:var(--text)">${s.rep}</td>
         <td>${s.t}</td><td>${s.c}</td>
         <td style="color:${pctColor(cp,80,60)};font-weight:600">${cp}%</td>
         <td style="color:var(--muted)">${milesStr}</td>
@@ -976,7 +976,7 @@ function buildReportHTML(allStops, start, end, cont, dqCount) {
           const milesStr=s.miles>0?Math.round(s.miles)+'mi':'—';
           return`<tr>
             <td>${rankBadge(i,salesReport.length)}</td>
-            <td style="font-weight:600;color:var(--white)">${s.rep}</td>
+            <td style="font-weight:600;color:var(--text)">${s.rep}</td>
             <td style="color:var(--muted)">${s.c}/${s.t}</td>
             <td style="${cellBg(cp,80,60)}">${cp}%</td>
             <td style="color:var(--muted)">${milesStr}</td>
