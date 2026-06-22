@@ -768,6 +768,7 @@ function render(){
   /* SALES */
   const salesMap={};
   allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
+  console.log('[REP DEBUG] sample assignedSales values:', allStops.slice(0,5).map(s=>({order:s.orderNumber,assignedSales:s.assignedSales,mainCustomerCode:s.mainCustomerCode})));
   const salesList=Object.values(salesMap).sort((a,b)=>(b.invoiceTotal||0)-(a.invoiceTotal||0)||b.t-a.t);
   document.getElementById('salesTbody').innerHTML=salesList.length===0?`<tr><td colspan="8" class="empty">No data</td></tr>`:
     salesList.map(s=>{
