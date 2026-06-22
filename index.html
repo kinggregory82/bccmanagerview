@@ -421,7 +421,7 @@ tbody tr:hover{background:#fff5f5}
 <script>
 const FIREBASE='https://bccsms-27c55-default-rtdb.firebaseio.com';
 const DISPATCH_URL='https://kinggregory82.github.io/bccdispatch';
-const DQ_ENDPOINT='https://dqtapim.azure-api.net/BensContractorCenter?subscription-key=b14ba32fef4b4c959d044af313e2b220';
+const DQ_ENDPOINT='https://spring-base-879f.gking-437.workers.dev/';
 
 async function fetchOrderSummary(startDate, endDate) {
   const query = `query orderSummary($input: GetOrderSummaryInput!, $first: Int) {
@@ -768,7 +768,6 @@ function render(){
   /* SALES */
   const salesMap={};
   allStops.forEach(s=>{const rep=(s.assignedSales||'—').trim()||'—';if(!salesMap[rep])salesMap[rep]={rep,t:0,c:0,invoiceTotal:0,invoiceCount:0,miles:0};salesMap[rep].t++;salesMap[rep].miles+=s._distanceMiles;if(s._saleTotal>0){salesMap[rep].invoiceTotal+=s._saleTotal;salesMap[rep].invoiceCount++;}if(isComplete(s))salesMap[rep].c++;});
-  console.log('[REP DEBUG] sample assignedSales values:', allStops.slice(0,5).map(s=>({order:s.orderNumber,assignedSales:s.assignedSales,mainCustomerCode:s.mainCustomerCode})));
   const salesList=Object.values(salesMap).sort((a,b)=>(b.invoiceTotal||0)-(a.invoiceTotal||0)||b.t-a.t);
   document.getElementById('salesTbody').innerHTML=salesList.length===0?`<tr><td colspan="8" class="empty">No data</td></tr>`:
     salesList.map(s=>{
